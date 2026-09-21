@@ -66,3 +66,4 @@ Six-terminal reset completed in 0.167 seconds with the same window IDs. Seven te
 - Native screensaver preview rendered; installed saver is listed in System Settings. Idle activation and native selection are not yet confirmed.
 - Actual reboot, sleep/wake and alternate physical display configurations remain untested.
 - Disengage and re-engage live run preserved all 24 window ID/PID pairs (zero lost) and returned Active. This includes the temporary Settings sheet; no agents were stopped.
+- Revised native preview visually checked with multicolor wordmark and cyan lightning scene; key 3 selects lightning successfully. Four eight-second scenes cycle. Installed updated signed saver after committing sources. Preview left open for user review; native idle activation remains unverified.
