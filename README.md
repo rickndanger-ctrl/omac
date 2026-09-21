@@ -26,3 +26,5 @@ Enter / Resume Five Pages does not create terminals. Command–Return creates on
 Page membership persists while switching and pausing. Orderly Exit saves membership for still-running windows on re-entry; exact tile trees are not restored after manager termination. Abrupt manager crashes and macOS restarts are not guaranteed to restore page assignments. No terminal sessions are closed by Exit. AeroSpace pages are virtual workspaces, separate from Mission Control Spaces.
 
 Rollback for this update: git revert the five-page commit, regenerate configuration with generate_config.py, then rebuild Launcher.swift and reload the configuration. To disable all management without stopping terminal sessions, run control.py rollback.
+
+Adding a terminal with Command–Return rebuilds the current page’s terminal grid, matching Four / Six: pairs form rows within columns. Other pages are untouched.

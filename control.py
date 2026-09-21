@@ -147,7 +147,7 @@ def enter(count=0,add=False):
   missing=expected-{w['window-title'] for w in terminal_windows()}
   if missing: raise RuntimeError('Terminal windows did not appear: '+', '.join(sorted(missing))+'. Resolve any Ghostty first-launch prompt and retry.')
   if add and active:
-   # Insert only new windows; preserve current sizes, positions and fullscreen state.
+   # Place new terminals on their requested page, then apply the same grid as Four / Six.
    all_tiles=terminal_windows()
    added=[w for w in all_tiles if w['window-title'] in expected-present]
    for w in added:
@@ -157,6 +157,7 @@ def enter(count=0,add=False):
    if added:
     aero('workspace',workspace)
     aero('focus','--window-id',str(added[-1]['window-id']))
+    arrange(workspace)
    total=len(terminal_windows(workspace))
   elif count:
    for w in terminal_windows():
