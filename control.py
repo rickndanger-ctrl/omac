@@ -117,12 +117,13 @@ def arrange(workspace=None):
                    f'layout --window-id {wid} tiling'])
  commands.extend([f'workspace {workspace}',f'focus --window-id {ids[0]}',
                   'flatten-workspace-tree',f'layout --workspace {workspace} --root h_tiles'])
- for wid in reversed(ids):
-  commands.extend([f'move --window-id {wid} left || true']*len(ids))
- for i in range(1,len(ids),2):
-  commands.extend([f'join-with --window-id {ids[i]} left',f'layout --window-id {ids[i]} v_tiles'])
- commands.extend([f'balance-sizes --workspace {workspace}',f'focus --window-id {target}'])
  aero('eval','; '.join(commands))
+ # Query the actual tree order after flattening; title order need not match it.
+ ordered=[str(w['window-id']) for w in windows() if str(w['window-id']) in ids]
+ for i in range(0,len(ordered)-1,2):
+  aero('join-with','--window-id',ordered[i],'right')
+ aero('balance-sizes','--workspace',workspace)
+ aero('focus','--window-id',target)
  return len(tiles)
 
 def start_services():

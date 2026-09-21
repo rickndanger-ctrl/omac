@@ -319,6 +319,8 @@ class Delegate: NSObject,NSApplicationDelegate {
     panel.title="Shortcuts";panel.titleVisibility = .hidden;panel.titlebarAppearsTransparent=true
     panel.isReleasedWhenClosed=false;panel.isOpaque=false;panel.hasShadow=true;panel.hidesOnDeactivate=false
     panel.backgroundColor=NSColor(calibratedRed:0.08,green:0.10,blue:0.13,alpha:0.85)
+    panel.level = .floating
+    panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
     panel.appearance=NSAppearance(named:.darkAqua)
     let web=WKWebView(frame:panel.contentView!.bounds);web.autoresizingMask=[.width,.height]
     web.setValue(false,forKey:"drawsBackground")
@@ -327,7 +329,7 @@ class Delegate: NSObject,NSApplicationDelegate {
    }
    guard let panel=guide else {return}
    // A nonactivating palette accepts keys without focusing the app's old workspace.
-   panel.center();panel.makeKeyAndOrderFront(nil)
+   panel.center();panel.makeKeyAndOrderFront(nil);panel.orderFrontRegardless()
 
  }
  func perform(_ action:String) {
