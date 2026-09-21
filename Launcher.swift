@@ -166,29 +166,83 @@ if !CommandLine.arguments.contains("--managed") {
 }
 final class OmacBrandBar {
  private var wallpaperURL: URL?
- private(set) var accent=NSColor(calibratedRed:0.55,green:0.9,blue:0.35,alpha:1)
- private var silhouette=NSBezierPath()
- init(logo:String) {
+ private(set) var accent = NSColor(calibratedRed:0.55,green:0.9,blue:0.35,alpha:1)
+ private var silhouette = NSBezierPath()
+ init(logo: String) {
   if let image=NSImage(contentsOfFile:logo),let data=image.tiffRepresentation,let bitmap=NSBitmapImageRep(data:data) {
-   let left=Int(Double(bitmap.pixelsWide)*0.239),top=Int(Double(bitmap.pixelsHigh)*0.608),right=Int(Double(bitmap.pixelsWide)*0.760),bottom=Int(Double(bitmap.pixelsHigh)*0.752)
-   for y in stride(from:top,to:bottom,by:2) { for x in stride(from:left,to:right,by:2) { if let c=bitmap.colorAt(x:x,y:y)?.usingColorSpace(.deviceRGB),c.greenComponent>0.48 && c.greenComponent>c.blueComponent*1.2 { silhouette.appendRect(NSRect(x:Double(x-left)/Double(right-left)*47,y:Double(bottom-y)/Double(bottom-top)*13,width:0.2,height:0.2)) } } }
+   let left=Int(Double(bitmap.pixelsWide)*0.239), top=Int(Double(bitmap.pixelsHigh)*0.608)
+   let right=Int(Double(bitmap.pixelsWide)*0.760), bottom=Int(Double(bitmap.pixelsHigh)*0.752)
+   for y in stride(from:top,to:bottom,by:2) {for x in stride(from:left,to:right,by:2) {
+    if let c=bitmap.colorAt(x:x,y:y)?.usingColorSpace(.deviceRGB), c.greenComponent>0.48 && c.greenComponent>c.blueComponent*1.2 {
+     silhouette.appendRect(NSRect(x:Double(x-left)/Double(right-left)*47,y:Double(bottom-y)/Double(bottom-top)*13,width:0.20,height:0.20))
+    }
+   }}
   }
  }
+ func refreshPalette() {
+  guard let screen=NSScreen.main ?? NSScreen.screens.first,var url=NSWorkspace.shared.desktopImageURL(for:screen) else {return}
+  // macOS can report DefaultDesktop for a wallpaper owned by its newer wallpaper service.
+  // In that case use the wallpaper selected through Omac's own appearance menu.
+  if url.lastPathComponent=="DefaultDesktop.heic",let choice=try? String(contentsOf:wallpaperChoice,encoding:.utf8) {
+   let selected=URL(fileURLWithPath:root+"/branding/wallpapers/omac-"+choice+".png")
+   if FileManager.default.fileExists(atPath:selected.path) {url=selected}
+  }
+  guard url != wallpaperURL else {return}
+  wallpaperURL=url
+  guard let image=NSImage(contentsOf:url) else {return}
+  let small=NSImage(size:NSSize(width:64,height:36));small.lockFocus();image.draw(in:NSRect(x:0,y:0,width:64,height:36));small.unlockFocus()
+  guard let data=small.tiffRepresentation,let bitmap=NSBitmapImageRep(data:data) else {return}
+  var bins=Array(repeating:(weight:CGFloat(0),r:CGFloat(0),g:CGFloat(0),b:CGFloat(0)),count:24)
+  for y in 0..<bitmap.pixelsHigh {for x in 0..<bitmap.pixelsWide {
+   guard let c=bitmap.colorAt(x:x,y:y)?.usingColorSpace(.deviceRGB),c.saturationComponent>0.35,c.brightnessComponent>0.15 else {continue}
+   let i=min(23,Int(c.hueComponent*24)),w=c.saturationComponent*c.brightnessComponent*c.brightnessComponent
+   bins[i].weight += w;bins[i].r += c.redComponent*w;bins[i].g += c.greenComponent*w;bins[i].b += c.blueComponent*w
+  }}
+  if let best=bins.max(by:{$0.weight<$1.weight}),best.weight>0 {
+   let c=NSColor(calibratedRed:best.r/best.weight,green:best.g/best.weight,blue:best.b/best.weight,alpha:1)
+   accent=NSColor(calibratedHue:c.hueComponent,saturation:min(0.65,c.saturationComponent),brightness:0.95,alpha:1)
+  } else {accent = .lightGray}
+ }
  func image(page:Int,status:String)->NSImage {
-  let image=NSImage(size:NSSize(width:168,height:22));image.lockFocus();let active=status=="Active",color=active ? accent:NSColor.secondaryLabelColor
-  color.setFill();silhouette.fill()
-  for n in 1...5 { let r=NSRect(x:56+(n-1)*22,y:2,width:19,height:18),p=NSBezierPath(roundedRect:r,xRadius:5,yRadius:5);if n==page && active {color.withAlphaComponent(0.27).setFill();p.fill();color.setStroke();p.lineWidth=1;p.stroke()};let a:[NSAttributedString.Key:Any]=[.font:NSFont.monospacedDigitSystemFont(ofSize:11,weight:n==page ? .bold:.medium),.foregroundColor:color.withAlphaComponent(n==page ? 1:0.55)];let t="\(n)" as NSString,s=t.size(withAttributes:a);t.draw(at:NSPoint(x:r.midX-s.width/2,y:r.midY-s.height/2),withAttributes:a) }
+  refreshPalette()
+  let image=NSImage(size:NSSize(width:168,height:22));image.lockFocus()
+  let active=status=="Active", color=active ? accent:NSColor.secondaryLabelColor
+  NSGraphicsContext.saveGraphicsState();let transform=NSAffineTransform();transform.translateX(by:0,yBy:4);transform.concat();color.setFill();silhouette.fill();NSGraphicsContext.restoreGraphicsState()
+  for n in 1...5 {
+   let r=NSRect(x:56+(n-1)*22,y:2,width:19,height:18)
+   let p=NSBezierPath(roundedRect:r,xRadius:5,yRadius:5)
+   if n==page && active {color.withAlphaComponent(0.27).setFill();p.fill();color.setStroke();p.lineWidth=1;p.stroke()}
+   let attributes:[NSAttributedString.Key:Any]=[.font:NSFont.monospacedDigitSystemFont(ofSize:11,weight:n==page ? .bold:.medium),.foregroundColor:color.withAlphaComponent(n==page ? 1:0.55)]
+   let text="\(n)" as NSString, size=text.size(withAttributes:attributes)
+   text.draw(at:NSPoint(x:r.midX-size.width/2,y:r.midY-size.height/2),withAttributes:attributes)
+  }
   image.unlockFocus();image.isTemplate=false;return image
  }
 }
+
 class GuidePanel: NSPanel {
  override func cancelOperation(_ sender:Any?) {orderOut(nil)}
 }
 class Delegate: NSObject,NSApplicationDelegate {
  var item:NSStatusItem!; var busy=false; var guide:GuidePanel?
- let brandBar=OmacBrandBar(logo:root+"/branding/Omac.png");var barTimer:Timer?
+ let brandBar=OmacBrandBar(logo:root+"/branding/Omac.png")
+ var barTimer:Timer?;var barRefreshing=false
  func statusTitle(_ text:String) { refreshBar() }
- func refreshBar() { guard item != nil else{return};DispatchQueue.global(qos:.utility).async { let r=process(aerospace ?? "/missing/aerospace",["list-workspaces","--focused"]),page=Int(r.1.trimmingCharacters(in:.whitespacesAndNewlines)) ?? 0,status=(try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8)) ?? "Inactive";DispatchQueue.main.async { self.item.button?.title="";self.item.button?.image=self.brandBar.image(page:page,status:status);self.item.button?.toolTip="Omac · \(status) · Page \(page) · Command 1–5 to switch" } } }
+ func refreshBar() {
+  guard !barRefreshing else {return};barRefreshing=true
+  DispatchQueue.global(qos:.utility).async {
+   let result=process(aerospace ?? "/missing/aerospace",["list-workspaces","--focused"])
+   let page=Int(result.1.trimmingCharacters(in:.whitespacesAndNewlines)) ?? 0
+   let status=(try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8)) ?? "Inactive"
+   DispatchQueue.main.async {
+    self.barRefreshing=false
+    self.item.button?.title=""
+    self.item.button?.image=self.brandBar.image(page:page,status:status)
+    self.item.button?.toolTip="Omac · \(status) · Page \(page) · Command 1–5 to switch"
+    self.item.button?.setAccessibilityLabel("Omac, \(status), page \(page) of 5")
+   }
+  }
+ }
  @objc func engageNotification(_ note:Notification) {try? FileManager.default.removeItem(at:state.appendingPathComponent("engage.request"));perform("enter")}
  func applicationShouldHandleReopen(_ sender:NSApplication,hasVisibleWindows flag:Bool)->Bool {perform("enter");return true}
  func applicationDockMenu(_ sender:NSApplication)->NSMenu? {item.menu}
@@ -277,6 +331,15 @@ class Delegate: NSObject,NSApplicationDelegate {
 
  }
  func perform(_ action:String) {
+  if action=="menu" {
+   guide?.orderOut(nil)
+   guard let menu=item.menu else {return}
+   let screen=NSScreen.screens.first(where:{$0.frame.contains(NSEvent.mouseLocation)}) ?? NSScreen.main
+   let frame=screen?.visibleFrame ?? NSRect(x:0,y:0,width:1000,height:700)
+   menu.popUp(positioning:menu.items.first,at:NSPoint(x:frame.midX-140,y:frame.midY+160),in:nil)
+   return
+  }
+
   if action=="setup" {
    let alert=NSAlert();alert.messageText="Omac setup"
    alert.informativeText="Dependencies: "+(missingDependencies().isEmpty ? "Ready" : missingDependencies().joined(separator:", "))+"\nWindow control: "+(AXIsProcessTrusted() ? "Authorized":"Permission needed")+"\nStart at Login: "+(SMAppService.mainApp.status == .enabled ? "On":"Off or awaiting approval")
