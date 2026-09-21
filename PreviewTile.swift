@@ -118,21 +118,22 @@ public final class OmacPreviewTileController: NSObject, NSWindowDelegate, SCStre
         receivedFrames += 1
         guard CMSampleBufferIsValid(sampleBuffer), CMSampleBufferDataIsReady(sampleBuffer),
               let attachments = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: false) as? [[SCStreamFrameInfo: Any]],
-              let status = attachments.first?[.status] as? SCFrameStatus, status == .complete else {
+              let rawStatus = attachments.first?[.status] as? Int,
+              SCFrameStatus(rawValue: rawStatus) == .complete else {
             rejectedFrames += 1
-            reportStatus("Frames (receivedFrames) · rejected (rejectedFrames) · incomplete")
+            reportStatus("Frames \(receivedFrames) · rejected \(rejectedFrames) · incomplete")
             return
         }
         let format = CVPixelBufferGetPixelFormatType(pixelBuffer)
         observedPixelFormat = format
         guard format == kCVPixelFormatType_32BGRA else {
             rejectedFrames += 1
-            reportStatus("Frames (receivedFrames) · unsupported pixel format (format)")
+            reportStatus("Frames \(receivedFrames) · unsupported pixel format \(format)")
             return
         }
         guard pendingFrame.wait(timeout: .now()) == .success else {
             droppedFrames += 1
-            reportStatus("Frames (receivedFrames) · displayed (displayedFrames) · dropped (droppedFrames)")
+            reportStatus("Frames \(receivedFrames) · displayed \(displayedFrames) · dropped \(droppedFrames)")
             return
         }
         CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
@@ -147,7 +148,7 @@ public final class OmacPreviewTileController: NSObject, NSWindowDelegate, SCStre
             let imageSize = NSSize(width: cgImage.width, height: cgImage.height)
             self.imageView.image = NSImage(cgImage: cgImage, size: imageSize)
             self.displayedFrames += 1
-            self.reportStatus("Frames (self.receivedFrames) · displayed (self.displayedFrames) · dropped (self.droppedFrames)")
+            self.reportStatus("Frames \(self.receivedFrames) · displayed \(self.displayedFrames) · dropped \(self.droppedFrames)")
         }
     }
 
