@@ -106,6 +106,11 @@ if CommandLine.arguments.contains("--guide") {
  RunLoop.current.run(until:Date(timeIntervalSinceNow:0.15))
  exit(0)
 }
+if CommandLine.arguments.contains("--login") {
+ let result=process("/opt/homebrew/bin/python3",[root+"/control.py","login"])
+ if !result.1.isEmpty {fputs(result.1, result.0==0 ? stdout:stderr)}
+ exit(result.0)
+}
 if !CommandLine.arguments.contains("--managed") {
  FileManager.default.createFile(atPath:state.appendingPathComponent("menu.enabled").path,contents:Data())
  let job="gui/\(getuid())/com.richard.acc.menu"

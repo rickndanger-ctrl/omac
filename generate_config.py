@@ -78,7 +78,7 @@ env={'PATH':str(Path.home()/'.local/bin')+':/opt/homebrew/bin:/usr/bin:/bin:/usr
 app='/Applications/Agent Control Center.app/Contents/MacOS/AgentControlCenter'
 for name,args,keep in [
  ('watcher',['/opt/homebrew/bin/python3',str(r/'watcher.py')],{'PathState':{str(s/'aerospace.enabled'):True}}),
- ('login',['/opt/homebrew/bin/python3',str(r/'control.py'),'login'],False),
+ ('login',[app,'--login'],False),
  ('menu',[app,'--managed'],{'PathState':{str(s/'menu.enabled'):True}}),
  ('aerospace',['/Applications/AeroSpace.app/Contents/MacOS/AeroSpace','--config-path',str(r/'config/aerospace.toml')],{'PathState':{str(s/'aerospace.enabled'):True}}),
  *[('terminal.'+role.lower(),['/usr/bin/open','-W','-n','-a','/Applications/Ghostty.app','--args','--title=ACC · '+role,'--config-file='+str(r/'config/ghostty.conf'),'--working-directory='+str(Path.home()/'Documents')],False) for role in [str(i) for i in range(1,31)]]]:

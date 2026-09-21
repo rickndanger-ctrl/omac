@@ -13,9 +13,8 @@
 	<string>com.richard.acc.login</string>
 	<key>ProgramArguments</key>
 	<array>
-		<string>/opt/homebrew/bin/python3</string>
-		<string>/Users/richardholguin/Documents/Codex/2026-09-20/is-x20/outputs/agent-control-center/control.py</string>
-		<string>login</string>
+		<string>/Applications/Agent Control Center.app/Contents/MacOS/AgentControlCenter</string>
+		<string>--login</string>
 	</array>
 	<key>RunAtLoad</key>
 	<true/>
