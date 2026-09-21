@@ -94,6 +94,22 @@ func missingDependencies()->[String] {
  if !FileManager.default.fileExists(atPath:root+"/control.py") {missing.append("Omac bundled resources")}
  return missing
 }
+if let index = CommandLine.arguments.firstIndex(of: "--window-frame"), CommandLine.arguments.count > index + 6 {
+ do {
+  guard let id=UInt32(CommandLine.arguments[index+1]),let pid=Int32(CommandLine.arguments[index+2]) else {throw NativeTargetError.missing}
+  let numbers=CommandLine.arguments[(index+3)...(index+6)].compactMap(Double.init)
+  guard numbers.count == 4,numbers.allSatisfy({$0.isFinite}),numbers[2]>0,numbers[3]>0 else {throw NativeTargetError.geometry}
+  let target=try NativeWindowTarget.resolve(id:id,pid:pid)
+  var point=CGPoint(x:numbers[0],y:numbers[1]),size=CGSize(width:numbers[2],height:numbers[3])
+  guard let p=AXValueCreate(.cgPoint,&point),let z=AXValueCreate(.cgSize,&size),
+   AXUIElementSetAttributeValue(target.element,kAXPositionAttribute as CFString,p) == .success,
+   AXUIElementSetAttributeValue(target.element,kAXSizeAttribute as CFString,z) == .success else {throw NativeTargetError.geometry}
+  RunLoop.current.run(until:Date(timeIntervalSinceNow:0.15))
+  let actual=try NativeWindowTarget.resolve(id:id,pid:pid).frame
+  guard abs(actual.minX-point.x)<2,abs(actual.minY-point.y)<2,abs(actual.width-size.width)<2,abs(actual.height-size.height)<2 else {throw NativeTargetError.geometry}
+  print("Verified requested window frame");exit(0)
+ } catch {fputs("Window frame not verified: \(error)\n",stderr);exit(1)}
+}
 if let index = CommandLine.arguments.firstIndex(of: "--window-half"), CommandLine.arguments.count > index + 2 {
  do {
   guard let id=UInt32(CommandLine.arguments[index+1]),let pid=Int32(CommandLine.arguments[index+2]) else {throw NativeTargetError.missing}
@@ -104,6 +120,8 @@ if let index = CommandLine.arguments.firstIndex(of: "--window-half"), CommandLin
    guard let p=AXValueCreate(.cgPoint,&point),let z=AXValueCreate(.cgSize,&size),
     AXUIElementSetAttributeValue(target.element,kAXPositionAttribute as CFString,p) == .success,
     AXUIElementSetAttributeValue(target.element,kAXSizeAttribute as CFString,z) == .success else {throw NativeTargetError.geometry}
+   RunLoop.current.run(until:Date(timeIntervalSinceNow:0.08))
+   guard AXUIElementSetAttributeValue(target.element,kAXPositionAttribute as CFString,p) == .success else {throw NativeTargetError.geometry}
   }
   do {
    try setFrame(desired)

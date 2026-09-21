@@ -102,3 +102,9 @@ Native `--window-target ID PID` resolves the AX window by WindowServer ID using 
 A temporary Finder window was floated explicitly and resized through the new `--window-half ID PID` prototype command. A no-margin request was rejected and rolled back when macOS clamped the frame. The eight-pixel-margin target passed exact bounds readback, and the Finder window was visually inspected via CUA, then closed by its specific window ID. No installed Omac binary or bindings were changed. Multi-window/sibling isolation, Mini 2, original tree-slot restoration, and controller integration remain pending.
 
 Fixed actual CLI contract: default AeroSpace JSON omits PID/workspace/layout, so the controller now requests these fields explicitly; real tiled layouts are h_tiles/v_tiles. Included tile_modes.py in the packaging manifest. Unit suite: 35 passed.
+
+### Follow-through: two windows and second Mac
+
+Two temporary Finder windows on Mini 1 began at [8,38,948,1033] and [964,38,948,1033]. The second window was selected by exact ID, moved to half-screen, returned to its recorded frame, and re-tiled. Both windows read back their original bounds afterward; only those temporary windows were closed. A final position application after the size change was necessary for macOS to settle the requested bounds.
+
+The same native target probe ran read-only over SSH on Mini 2 and resolved its live Chrome window to the physical display visible frame [1180,0,1920,1080], rather than assuming the primary virtual display. No Mini 2 window was resized and no installed binary changed. Half currently floats the target and does not yet reserve grid space from neighbors; the daily binding must remain gated until shared-grid behavior is implemented.
