@@ -81,3 +81,23 @@ final class ShelfPanel: NSPanel {
     }
     override func cancelOperation(_ sender: Any?) { orderOut(nil) }
 }
+
+// Scan only application roots, never bundle internals or user documents.
+func omacInstalledApplications() -> [(name:String,bundleID:String,url:URL)] {
+ var found:[String:(name:String,bundleID:String,url:URL)]=[:]
+ let roots=["/Applications",NSHomeDirectory()+"/Applications","/System/Applications","/System/Library/CoreServices/Applications"]
+ for root in roots {
+  guard let walker=FileManager.default.enumerator(at:URL(fileURLWithPath:root),includingPropertiesForKeys:nil,options:[.skipsHiddenFiles,.skipsPackageDescendants]) else {continue}
+  for case let url as URL in walker where url.pathExtension.lowercased()=="app" {
+   walker.skipDescendants()
+   guard let bundle=Bundle(url:url),let id=bundle.bundleIdentifier,found[id]==nil,
+    id != "com.richard.agentcontrolcenter",
+    (bundle.object(forInfoDictionaryKey:"LSUIElement") as? NSNumber)?.boolValue != true,
+    (bundle.object(forInfoDictionaryKey:"LSBackgroundOnly") as? NSNumber)?.boolValue != true else {continue}
+   let name=(bundle.object(forInfoDictionaryKey:"CFBundleDisplayName") as? String) ?? (bundle.object(forInfoDictionaryKey:"CFBundleName") as? String) ?? url.deletingPathExtension().lastPathComponent
+   found[id]=(name,id,url)
+  }
+ }
+ if let finder=NSWorkspace.shared.urlForApplication(withBundleIdentifier:"com.apple.finder") {found["com.apple.finder"]=("Finder","com.apple.finder",finder)}
+ return found.values.sorted {$0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending}
+}

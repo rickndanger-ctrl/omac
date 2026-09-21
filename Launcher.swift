@@ -441,16 +441,15 @@ class Delegate: NSObject,NSApplicationDelegate {
    let m=NSMenuItem(title:title,action:#selector(selected(_:)),keyEquivalent:""); m.representedObject=action; m.target=self; menu.addItem(m)
   }
   menu.addItem(.separator())
-  let apps=NSMenuItem(title:"Apps",action:nil,keyEquivalent:"")
-  let appMenu=NSMenu()
-  for (title,bundle) in [("Codex","com.openai.codex"),("Claude","com.anthropic.claudefordesktop"),("Hermes","com.nousresearch.hermes.setup"),("Cursor","com.todesktop.230313mzl4w4u92"),("VS Code","com.microsoft.VSCode"),("Telegram","ru.keepcoder.Telegram"),("Messages","com.apple.MobileSMS"),("Mail","com.apple.mail"),("Chrome","com.google.Chrome"),("Finder","com.apple.finder")] {
-   guard NSWorkspace.shared.urlForApplication(withBundleIdentifier:bundle) != nil else {continue}
-   let entry=NSMenuItem(title:title,action:#selector(launchApp(_:)),keyEquivalent:"")
-   entry.representedObject=bundle;entry.target=self;appMenu.addItem(entry)
+  let appsHeading=NSMenuItem(title:"Applications",action:nil,keyEquivalent:"")
+  appsHeading.isEnabled=false;menu.addItem(appsHeading)
+  for app in omacInstalledApplications() {
+   let entry=NSMenuItem(title:app.name,action:#selector(launchApp(_:)),keyEquivalent:"")
+   entry.representedObject=app.bundleID;entry.target=self
+   let icon=NSWorkspace.shared.icon(forFile:app.url.path);icon.size=NSSize(width:18,height:18);entry.image=icon
+   menu.addItem(entry)
   }
-  appMenu.addItem(.separator())
-  let all=NSMenuItem(title:"All Applications…",action:#selector(openApplications),keyEquivalent:"");all.target=self;appMenu.addItem(all)
-  apps.submenu=appMenu;menu.addItem(apps)
+  menu.addItem(.separator())
   let settings=NSMenuItem(title:"Settings",action:nil,keyEquivalent:"");let settingsMenu=NSMenu()
   for (title,url) in [("System Settings","x-apple.systempreferences:"),("Displays","x-apple.systempreferences:com.apple.Displays-Settings.extension"),("Keyboard","x-apple.systempreferences:com.apple.Keyboard-Settings.extension"),("Accessibility Permission","x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")] {
    let entry=NSMenuItem(title:title,action:#selector(openSettings(_:)),keyEquivalent:"");entry.representedObject=url;entry.target=self;settingsMenu.addItem(entry)
