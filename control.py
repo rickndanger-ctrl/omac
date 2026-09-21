@@ -4,6 +4,7 @@ import fcntl,json,os,plistlib,subprocess,sys,time
 from functools import lru_cache
 from pathlib import Path
 from portable_paths import SOURCE as ROOT, STATE, RUNTIME, AERO, APP
+from tile_modes import Mode,TileModePlanner,WindowIdentity,WindowSnapshot
 STATE.mkdir(parents=True,exist_ok=True)
 DOMAIN=f'gui/{os.getuid()}'
 ROLES=[str(i) for i in range(1,31)]
@@ -87,6 +88,57 @@ def ready():
   except Exception: time.sleep(.2)
  raise RuntimeError('AeroSpace is not ready. Grant AeroSpace Accessibility access in System Settings, then try Enter again.')
 def save_status(value): (STATE/'status').write_text(value)
+
+def _tile_mode_path(): return STATE/'tile-modes.json'
+def _tile_mode_key(identity): return f'{identity.boot}:{identity.app_pid}:{identity.window_id}'
+def _load_tile_modes():
+ try: return json.loads(_tile_mode_path().read_text())
+ except (FileNotFoundError,ValueError,OSError): return {}
+def _save_tile_modes(data):
+ temp=STATE/'tile-modes.tmp';temp.write_text(json.dumps(data));temp.replace(_tile_mode_path())
+
+def _ax_half(pid):
+ # AeroSpace has no exact half-width primitive; AX places the selected app on
+ # the left half of the visible main screen without changing its process.
+ script='''ObjC.import("AppKit");
+const s=$.NSScreen.mainScreen.visibleFrame;
+const p=Application("System Events").processes.whose({unixId:%d})[0];
+const w=p.windows[0];
+w.position=[s.origin.x,s.origin.y];
+w.size=[Math.floor(s.size.width/2),s.size.height];''' % pid
+ run('/usr/bin/osascript','-l','JavaScript','-e',script)
+
+def size_window(mode):
+ try: mode=Mode(mode)
+ except (TypeError,ValueError) as exc: raise RuntimeError('size must be small, half, or full') from exc
+ focused=json.loads(aero('list-windows','--focused','--json'))
+ if not focused: raise RuntimeError('Focus a window first.')
+ window=focused[0]
+ try:
+  identity=WindowIdentity(int(window['window-id']),int(window['app-pid']),boot_session())
+ except (KeyError,TypeError,ValueError) as exc: raise RuntimeError('Focused window has no stable identity.') from exc
+ workspace=window.get('workspace')
+ if workspace not in ('1','2','3','4','5'): raise RuntimeError('Focused window is outside an Omac page.')
+ key=_tile_mode_key(identity);saved=_load_tile_modes();record=saved.get(key,{})
+ planner=TileModePlanner(WindowSnapshot(identity,workspace,str(identity.window_id)))
+ try: planner.mode=Mode(record.get('mode',Mode.SMALL.value))
+ except ValueError: planner.mode=Mode.SMALL
+ intent=planner.transition(identity,mode)
+ if intent.action=='noop': return f'Window already {mode.value}.'
+ wid=str(identity.window_id)
+ if mode is Mode.SMALL:
+  aero('fullscreen','off','--window-id',wid)
+  aero('layout','--window-id',wid,'tiling')
+ elif mode is Mode.HALF:
+  aero('fullscreen','off','--window-id',wid)
+  aero('layout','--window-id',wid,'floating')
+  _ax_half(identity.app_pid)
+ else:
+  aero('fullscreen','on','--window-id',wid)
+ saved[key]={'mode':mode.value,'workspace':workspace,'window-id':identity.window_id,'app-pid':identity.app_pid,'boot':identity.boot}
+ _save_tile_modes(saved)
+ aero('workspace',workspace)
+ return f'Window set to {mode.value}; session preserved.'
 
 def stop(restore=False):
  run('launchctl','bootout',job('watcher'),check=False)
@@ -279,6 +331,9 @@ def main():
      raise
     aero('focus','--window-id',wid)
     print('Terminal centered; Command-O returns it to tiling.')
+  elif action=='size':
+   if len(sys.argv)<3: raise RuntimeError('Usage: control.py size <small|half|full>')
+   print(size_window(sys.argv[2]))
   elif action in ('pause','exit'): print(stop(action=='exit'))
   elif action=='status': print((STATE/'status').read_text() if (STATE/'status').exists() else 'Inactive')
   elif action=='rollback':
