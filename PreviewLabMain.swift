@@ -6,7 +6,7 @@ import ScreenCaptureKit
 struct PreviewLabMain {
     static func main() {
         let app = NSApplication.shared
-        let delegate = PreviewLabDelegate()
+        let delegate: NSObject & NSApplicationDelegate = CommandLine.arguments.contains("--test-pattern") ? PreviewPatternDelegate() : PreviewLabDelegate()
         app.delegate = delegate
         app.setActivationPolicy(.regular)
         app.run()
@@ -71,4 +71,32 @@ final class PreviewLabDelegate: NSObject, NSApplicationDelegate {
     }
     func applicationWillTerminate(_ notification: Notification) { tile?.stop() }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+}
+
+// Deterministic capture source: contains no user content and changes once/second.
+final class PreviewPatternDelegate: NSObject, NSApplicationDelegate {
+    private var window: NSWindow!
+    private var timer: Timer?
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        window = NSWindow(contentRect:NSRect(x:100,y:100,width:640,height:400),styleMask:[.titled,.closable,.resizable],backing:.buffered,defer:false)
+        window.title = "Omac Capture Test Pattern"
+        window.isReleasedWhenClosed = false
+        let label = NSTextField(labelWithString:"Frame 0")
+        label.font = .monospacedSystemFont(ofSize:44,weight:.bold)
+        label.alignment = .center
+        label.frame = NSRect(x:20,y:150,width:600,height:70)
+        label.autoresizingMask = [.width,.minYMargin,.maxYMargin]
+        let content = NSView(frame:NSRect(x:0,y:0,width:640,height:400))
+        content.wantsLayer = true
+        content.layer?.backgroundColor = NSColor.systemPurple.cgColor
+        content.addSubview(label);window.contentView = content
+        var count = 0
+        timer = Timer.scheduledTimer(withTimeInterval:1,repeats:true) { _ in
+            count += 1; label.stringValue = "Frame \(count)"
+            content.layer?.backgroundColor = (count%2 == 0 ? NSColor.systemPurple : NSColor.systemTeal).cgColor
+        }
+        window.makeKeyAndOrderFront(nil)
+    }
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender:NSApplication)->Bool {true}
+    func applicationWillTerminate(_ notification:Notification) {timer?.invalidate()}
 }

@@ -167,11 +167,26 @@ public final class OmacPreviewTileController: NSObject, NSWindowDelegate, SCStre
         window.title = "Omac Preview"
         statusLabel.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
         statusLabel.textColor = .secondaryLabelColor
-        let stack = NSStackView(views: [imageView, statusLabel])
-        stack.orientation = .vertical
-        stack.spacing = 4
-        stack.edgeInsets = NSEdgeInsets(top: 6, left: 6, bottom: 6, right: 6)
-        window.contentView = stack
+        let content = NSView()
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        statusLabel.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(imageView)
+        content.addSubview(statusLabel)
+        imageView.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        imageView.setContentHuggingPriority(.defaultLow, for: .vertical)
+        imageView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        imageView.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+        NSLayoutConstraint.activate([
+            imageView.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 6),
+            imageView.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -6),
+            imageView.topAnchor.constraint(equalTo: content.topAnchor, constant: 6),
+            imageView.bottomAnchor.constraint(equalTo: statusLabel.topAnchor, constant: -4),
+            statusLabel.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 6),
+            statusLabel.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -6),
+            statusLabel.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -6),
+            statusLabel.heightAnchor.constraint(equalToConstant: 16)
+        ])
+        window.contentView = content
         window.delegate = self
         window.isReleasedWhenClosed = false
         window.makeKeyAndOrderFront(nil)
