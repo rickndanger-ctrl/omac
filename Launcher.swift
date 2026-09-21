@@ -299,7 +299,7 @@ class Delegate: NSObject,NSApplicationDelegate {
   if (try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8)) == "Active" { perform("enter") }
  }
  @objc func urlEvent(_ event:NSAppleEventDescriptor,reply:NSAppleEventDescriptor) {
-  if let text=event.paramDescriptor(forKeyword:AEKeyword(keyDirectObject))?.stringValue, let action=URL(string:text)?.host, ["exit","pause","enter","four","six","new","guide","menu","center","rescue"].contains(action) {perform(action)}
+  if let text=event.paramDescriptor(forKeyword:AEKeyword(keyDirectObject))?.stringValue, let action=URL(string:text)?.host, ["exit","pause","enter","four","six","new","guide","menu","center","rescue","refocus"].contains(action) {perform(action)}
  }
  @objc func selectPage(_ sender:NSMenuItem) { guard (try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8))=="Active" else{return};DispatchQueue.global().async {_=process(aerospace ?? "/missing/aerospace",["workspace",String(sender.tag)]);DispatchQueue.main.async{self.refreshBar()}} }
  @objc func launchApp(_ sender:NSMenuItem) {
@@ -343,17 +343,17 @@ class Delegate: NSObject,NSApplicationDelegate {
 
  }
  func perform(_ action:String) {
-  if action=="rescue" {
+  if action=="rescue" || action=="refocus" {
    guard (try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8))=="Active" else {return}
    guide?.orderOut(nil);item.menu?.cancelTracking()
    DispatchQueue.global().async {
     let aero=aerospace ?? "/missing/aerospace"
     let current=process(aero,["list-workspaces","--focused"]).1.trimmingCharacters(in:.whitespacesAndNewlines)
     guard ["1","2","3","4","5"].contains(current) else {return}
-    _=process(aero,["focus","--dfs-index","0"])
+    if action=="rescue" {_=process(aero,["focus","--dfs-index","0"])}
     let output=process(aero,["list-windows","--focused","--format","%{window-id} %{app-pid} %{window-layout}"])
     var fields=output.1.split(whereSeparator:{$0.isWhitespace}).map(String.init)
-    let excludedLayouts=["floating","macos_native_window_of_hidden_app","macos_fullscreen"]
+    let excludedLayouts=action=="rescue" ? ["floating","macos_native_window_of_hidden_app","macos_fullscreen"] : ["macos_native_window_of_hidden_app"]
     if fields.count >= 3 && excludedLayouts.contains(fields[2]) {
      let inventory=process(aero,["list-windows","--workspace",current,"--json"])
      if let data=inventory.1.data(using:.utf8),let rows=(try? JSONSerialization.jsonObject(with:data)) as? [[String:Any]],rows.count>1 {
@@ -371,7 +371,7 @@ class Delegate: NSObject,NSApplicationDelegate {
 
     // Recover only a confirmed minimized window from this boot and the same
     // app instance. A stale process ID must never activate an unrelated app.
-    if chosenPID == nil,
+    if action=="rescue",chosenPID == nil,
        let data=try? Data(contentsOf:state.appendingPathComponent("pages.json")),
        let saved=(try? JSONSerialization.jsonObject(with:data)) as? [String:Any],
        saved["boot"] as? String == process("/usr/sbin/sysctl",["-n","kern.boottime"]).1.trimmingCharacters(in:.whitespacesAndNewlines),
