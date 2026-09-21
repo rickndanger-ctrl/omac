@@ -83,6 +83,22 @@ class Delegate: NSObject,NSApplicationDelegate {
   for (title,action) in [("Enter / Resume Five Pages","enter"),("Open / Arrange 4 Terminals","four"),("Open / Arrange 6 Terminals","six"),("New Terminal (up to 6)","new"),("Pause Tiling and Shortcuts","pause"),("Exit and Restore Windows","exit"),("Shortcut Guide","guide"),("Accessibility Settings","access"),("Quit Launcher","quit")] {
    let m=NSMenuItem(title:title,action:#selector(selected(_:)),keyEquivalent:""); m.representedObject=action; m.target=self; menu.addItem(m)
   }
+  menu.addItem(.separator())
+  let apps=NSMenuItem(title:"Apps",action:nil,keyEquivalent:"")
+  let appMenu=NSMenu()
+  for (title,bundle) in [("Codex","com.openai.codex"),("Claude","com.anthropic.claudefordesktop"),("Hermes","com.nousresearch.hermes.setup"),("Cursor","com.todesktop.230313mzl4w4u92"),("VS Code","com.microsoft.VSCode"),("Telegram","ru.keepcoder.Telegram"),("Messages","com.apple.MobileSMS"),("Mail","com.apple.mail"),("Chrome","com.google.Chrome"),("Finder","com.apple.finder")] {
+   guard NSWorkspace.shared.urlForApplication(withBundleIdentifier:bundle) != nil else {continue}
+   let entry=NSMenuItem(title:title,action:#selector(launchApp(_:)),keyEquivalent:"")
+   entry.representedObject=bundle;entry.target=self;appMenu.addItem(entry)
+  }
+  appMenu.addItem(.separator())
+  let all=NSMenuItem(title:"All Applications…",action:#selector(openApplications),keyEquivalent:"");all.target=self;appMenu.addItem(all)
+  apps.submenu=appMenu;menu.addItem(apps)
+  let settings=NSMenuItem(title:"Settings",action:nil,keyEquivalent:"");let settingsMenu=NSMenu()
+  for (title,url) in [("System Settings","x-apple.systempreferences:"),("Displays","x-apple.systempreferences:com.apple.Displays-Settings.extension"),("Keyboard","x-apple.systempreferences:com.apple.Keyboard-Settings.extension"),("Accessibility Permission","x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")] {
+   let entry=NSMenuItem(title:title,action:#selector(openSettings(_:)),keyEquivalent:"");entry.representedObject=url;entry.target=self;settingsMenu.addItem(entry)
+  }
+  settings.submenu=settingsMenu;menu.addItem(settings)
   item.menu=menu
   // Recover safely after a launcher crash: release management, preserve sessions.
   if (try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8)) == "Active" { perform("pause") }
@@ -90,17 +106,47 @@ class Delegate: NSObject,NSApplicationDelegate {
  @objc func urlEvent(_ event:NSAppleEventDescriptor,reply:NSAppleEventDescriptor) {
   if let text=event.paramDescriptor(forKeyword:AEKeyword(keyDirectObject))?.stringValue, let action=URL(string:text)?.host, ["exit","pause","enter","four","six","new","guide","center"].contains(action) {perform(action)}
  }
+ @objc func launchApp(_ sender:NSMenuItem) {
+  guard let bundle=sender.representedObject as? String,let url=NSWorkspace.shared.urlForApplication(withBundleIdentifier:bundle) else {return}
+  NSWorkspace.shared.openApplication(at:url,configuration:NSWorkspace.OpenConfiguration())
+ }
+ @objc func openApplications() {NSWorkspace.shared.open(URL(fileURLWithPath:"/Applications"))}
+ @objc func openSettings(_ sender:NSMenuItem) {
+  if let value=sender.representedObject as? String,let url=URL(string:value) {NSWorkspace.shared.open(url)}
+ }
  @objc func selected(_ sender:NSMenuItem) { perform(sender.representedObject as! String) }
  func perform(_ action:String) {
   if action=="guide" {
+   // Capture the page before focusing the panel; open -g prevents premature activation.
+   let current=process("/opt/homebrew/bin/aerospace",["list-workspaces","--focused"])
+   let page=current.1.trimmingCharacters(in:.whitespacesAndNewlines)
    if guide==nil {
-    let panel=GuidePanel(contentRect:NSRect(x:0,y:0,width:850,height:720),styleMask:[.titled,.closable,.resizable],backing:.buffered,defer:false)
-    panel.title="Terminal Shortcuts";panel.isReleasedWhenClosed=false
+    let panel=GuidePanel(contentRect:NSRect(x:0,y:0,width:620,height:570),styleMask:[.titled,.closable,.fullSizeContentView],backing:.buffered,defer:false)
+    panel.title="Shortcuts";panel.titleVisibility = .hidden;panel.titlebarAppearsTransparent=true
+    panel.isReleasedWhenClosed=false;panel.isOpaque=false;panel.hasShadow=true
+    panel.backgroundColor=NSColor(calibratedRed:0.08,green:0.10,blue:0.13,alpha:0.85)
+    panel.appearance=NSAppearance(named:.darkAqua)
     let web=WKWebView(frame:panel.contentView!.bounds);web.autoresizingMask=[.width,.height]
+    web.setValue(false,forKey:"drawsBackground")
     web.loadFileURL(URL(fileURLWithPath:root+"/Guide.html"),allowingReadAccessTo:URL(fileURLWithPath:root))
     panel.contentView=web;guide=panel
    }
-   guide?.center();guide?.makeKeyAndOrderFront(nil);NSApp.activate(ignoringOtherApps:true);return
+   guard let panel=guide else {return}
+   if current.0==0 {
+    _=process("/opt/homebrew/bin/aerospace",["move-node-to-workspace","--window-id",String(panel.windowNumber),page])
+   }
+   panel.center();panel.orderFrontRegardless()
+   // Newly shown windows are detected asynchronously by AeroSpace.
+   DispatchQueue.main.asyncAfter(deadline:.now()+0.15) {
+    if current.0==0 {
+     let moved=process("/opt/homebrew/bin/aerospace",["move-node-to-workspace","--window-id",String(panel.windowNumber),page])
+     if moved.0 != 0 {panel.orderOut(nil);return}
+     _=process("/opt/homebrew/bin/aerospace",["layout","--window-id",String(panel.windowNumber),"floating"])
+     _=process("/opt/homebrew/bin/aerospace",["focus","--window-id",String(panel.windowNumber)])
+    }
+    panel.makeKeyAndOrderFront(nil);NSApp.activate(ignoringOtherApps:true)
+   }
+   return
   }
   if action=="access" {
    let key=kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String

@@ -28,3 +28,5 @@ Page membership persists while switching and pausing. Orderly Exit saves members
 Rollback for this update: git revert the five-page commit, regenerate configuration with generate_config.py, then rebuild Launcher.swift and reload the configuration. To disable all management without stopping terminal sessions, run control.py rollback.
 
 Adding a terminal with Command–Return rebuilds the current page’s terminal grid, matching Four / Six: pairs form rows within columns. Other pages are untouched.
+
+The compact shortcut guide uses an 85% opaque dark background and neutral text. Command–K brings it to the current page. The menu bar now includes Apps and Settings. New Command–Option shortcuts: R Cursor, V VS Code, T Telegram, I Messages, M Mail, S System Settings. App launch shortcuts open/focus existing apps; use their New Window command to create a window on another page.
