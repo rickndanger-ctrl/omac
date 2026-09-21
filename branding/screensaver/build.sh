@@ -28,4 +28,6 @@ cat > "$BUILD_DIR/OMAC-Preview.app/Contents/Info.plist" <<'PLIST'
 <key>CFBundleShortVersionString</key><string>1.0</string>
 </dict></plist>
 PLIST
+cp "$SCRIPT_DIR/../Omac.png" "$BUILD_DIR/OMAC.saver/Contents/Resources/Omac.png"
+cp "$SCRIPT_DIR/../Omac.png" "$BUILD_DIR/OMAC-Preview.app/Contents/Resources/Omac.png"
 echo "Built $BUILD_DIR/OMAC.saver and $BUILD_DIR/OMAC-Preview.app"
