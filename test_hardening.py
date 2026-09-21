@@ -12,6 +12,13 @@ class Hardening(unittest.TestCase):
  def test_previous_boot_does_not_move_reused_ids(self):
   (c.STATE/'pages.json').write_text(json.dumps({'boot':'old','page':'2','windows':[{'window-id':1,'app-pid':1,'workspace':'2'}]}))
   with patch.object(c,'boot_session',return_value='new'),patch.object(c,'aero') as aero:c.restore_pages();aero.assert_not_called()
+ def test_hidden_app_does_not_prevent_terminal_grid_recovery(self):
+  rows=[{'window-id':i,'app-pid':i,'workspace':'1','app-name':'Ghostty','window-layout':'v_tiles'} for i in range(1,5)]
+  rows.append({'window-id':9,'app-pid':9,'workspace':'1','app-name':'Messages','window-layout':'macos_native_window_of_hidden_app'})
+  (c.STATE/'pages.json').write_text(json.dumps({'boot':'same','page':'1','windows':rows}))
+  with patch.object(c,'boot_session',return_value='same'),patch.object(c,'windows',return_value=rows),patch.object(c,'aero'),patch.object(c,'arrange') as arrange:
+   c.restore_pages()
+   arrange.assert_called_once_with('1')
  def test_active_recovery_restores_before_enabling_bindings(self):
   c.save_status('Active');events=[]
   with patch.object(c,'ready'),patch.object(c,'restore_pages',side_effect=lambda:events.append('restore')),patch.object(c,'aero',side_effect=lambda *args,**kw:events.append(args)),patch.object(c,'save_pages'),patch.object(c,'load'),patch.object(c,'run'):

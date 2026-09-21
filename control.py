@@ -60,7 +60,7 @@ def restore_pages():
   for workspace in ('1','2','3','4','5'):
    saved=[w for w in data['windows'] if isinstance(w,dict) and w.get('workspace')==workspace]
    terminals=[w for w in saved if w.get('app-name')=='Ghostty']
-   if len(terminals)>=3 and all(w.get('window-layout')!='floating' for w in terminals) and all(w.get('app-name')=='Ghostty' or w.get('window-layout')=='floating' for w in saved):
+   if len(terminals)>=3 and all(w.get('window-layout')!='floating' for w in terminals) and all(w.get('app-name')=='Ghostty' or w.get('window-layout') in ('floating','macos_native_window_of_hidden_app','macos_fullscreen') for w in saved):
     arrange(workspace)
  target=data.get('page','1')
  aero('workspace',target if target in ('1','2','3','4','5') else '1')
