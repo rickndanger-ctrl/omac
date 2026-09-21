@@ -207,8 +207,10 @@ public final class AppShelf {
     }
     private func verifyWorkspace(_ id: CGWindowID, _ workspace: String) throws {
         guard let aerospace else { throw ShelfError.unavailable("AeroSpace is unavailable") }
-        let result = process(aerospace, ["list-windows", "--window-id", String(id), "--format", "%{workspace}"])
-        guard result.0 == 0, result.1.trimmingCharacters(in: .whitespacesAndNewlines) == workspace else {
+        let result = process(aerospace, ["list-windows", "--all", "--format", "%{window-id} %{workspace}", "--json"])
+        let rows = (try? JSONSerialization.jsonObject(with: Data(result.1.utf8))) as? [[String: Any]]
+        let actual = rows?.first { ($0["window-id"] as? Int).map(CGWindowID.init) == id }?["workspace"] as? String
+        guard result.0 == 0, actual == workspace else {
             throw ShelfError.unavailable("Window did not reach requested workspace")
         }
     }
