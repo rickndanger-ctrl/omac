@@ -5,7 +5,7 @@ s=Path.home()/'Library/Application Support/AgentControlCenter'
 s.mkdir(parents=True,exist_ok=True)
 config='''config-version = 2
 start-at-login = false
-after-startup-command = ['enable off']
+after-startup-command = []
 default-root-container-layout = 'tiles'
 default-root-container-orientation = 'horizontal'
 persistent-workspaces = ['Terminals']
