@@ -19,6 +19,10 @@ def job(name): return DOMAIN+'/com.richard.acc.'+name
 
 def load(name):
  p=subprocess.run(['launchctl','print',job(name)],capture_output=True)
+ if name.startswith('terminal.') and p.returncode==0 and b'--config-file=' not in p.stdout:
+  # Reload only when creating a missing terminal; preserve already-open Ghostty windows.
+  run('launchctl','bootout',job(name),check=False)
+  p.returncode=1
  if p.returncode: run('launchctl','bootstrap',DOMAIN,ROOT/'launchd'/f'{name}.plist')
 
 def windows(): return json.loads(aero('list-windows','--all','--json'))
@@ -117,6 +121,16 @@ def main():
  with (STATE/'controller.lock').open('w') as lock:
   fcntl.flock(lock,fcntl.LOCK_EX)
   if action in ('enter','four','six','new'): print(enter(6 if action=='six' else 4,add=action=='new'))
+  elif action=='center':
+   focused=json.loads(aero('list-windows','--focused','--json'))
+   if not focused or focused[0].get('app-name')!='Ghostty': raise RuntimeError('Focus a terminal first.')
+   wid=str(focused[0]['window-id'])
+   pid=aero('list-windows','--focused','--format','%{app-pid}')
+   aero('fullscreen','off','--window-id',wid)
+   aero('layout','--window-id',wid,'floating')
+   run(APP,'--center',pid)
+   aero('focus','--window-id',wid)
+   print('Terminal centered; Command-T returns it to tiling.')
   elif action in ('pause','exit'): print(stop(action=='exit'))
   elif action=='status': print((STATE/'status').read_text() if (STATE/'status').exists() else 'Inactive')
   elif action=='rollback':

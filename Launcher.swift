@@ -1,5 +1,6 @@
 import Cocoa
 import ApplicationServices
+import WebKit
 let root = "/Users/richardholguin/Documents/Codex/2026-09-20/is-x20/outputs/agent-control-center"
 let state = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/AgentControlCenter")
 try? FileManager.default.createDirectory(at: state, withIntermediateDirectories: true)
@@ -20,6 +21,23 @@ func eachWindow(_ body: (NSRunningApplication,AXUIElement,Int)->Void) {
  }
 }
 let snapshot = state.appendingPathComponent("windows.json")
+if let index=CommandLine.arguments.firstIndex(of:"--center"), CommandLine.arguments.count>index+1, let pid=Int32(CommandLine.arguments[index+1]) {
+ guard AXIsProcessTrusted() else { fputs("Accessibility access required.\n",stderr);exit(2) }
+ let target=AXUIElementCreateApplication(pid)
+ guard let raw=attribute(target,kAXFocusedWindowAttribute),CFGetTypeID(raw)==AXUIElementGetTypeID() else {exit(3)}
+ let window=raw as! AXUIElement
+ var old=CGPoint.zero
+ if let value=attribute(window,kAXPositionAttribute),CFGetTypeID(value)==AXValueGetTypeID() { AXValueGetValue(value as! AXValue,.cgPoint,&old) }
+ let top=NSScreen.screens.first?.frame.maxY ?? 0
+ let screen=NSScreen.screens.first(where:{$0.frame.contains(CGPoint(x:old.x+10,y:top-old.y-10))}) ?? NSScreen.main!
+ let frame=screen.visibleFrame
+ var size=CGSize(width:frame.width*0.72,height:frame.height*0.80)
+ var point=CGPoint(x:frame.midX-size.width/2,y:top-frame.midY-size.height/2)
+ let a=AXUIElementSetAttributeValue(window,kAXSizeAttribute as CFString,AXValueCreate(.cgSize,&size)!)
+ let b=AXUIElementSetAttributeValue(window,kAXPositionAttribute as CFString,AXValueCreate(.cgPoint,&point)!)
+ if a != .success || b != .success {fputs("Could not center the terminal.\n",stderr);exit(4)}
+ print("Centered terminal");exit(0)
+}
 if CommandLine.arguments.contains("--snapshot") {
  guard AXIsProcessTrusted() else { fputs("Grant Agent Control Center Accessibility access in System Settings before entering.\n",stderr); exit(2) }
  if !FileManager.default.fileExists(atPath:snapshot.path) {
@@ -53,8 +71,11 @@ if !CommandLine.arguments.contains("--managed") {
  if process("/bin/launchctl",["print",job]).0 != 0 { _=process("/bin/launchctl",["bootstrap","gui/\(getuid())",root+"/launchd/menu.plist"]) }
  _=process("/bin/launchctl",["kickstart",job]); exit(0)
 }
+class GuidePanel: NSPanel {
+ override func cancelOperation(_ sender:Any?) {orderOut(nil)}
+}
 class Delegate: NSObject,NSApplicationDelegate {
- var item:NSStatusItem!; var busy=false
+ var item:NSStatusItem!; var busy=false; var guide:GuidePanel?
  func applicationDidFinishLaunching(_ note:Notification) {
   NSAppleEventManager.shared().setEventHandler(self,andSelector:#selector(urlEvent(_:reply:)),forEventClass:AEEventClass(kInternetEventClass),andEventID:AEEventID(kAEGetURL))
   item=NSStatusBar.system.statusItem(withLength:NSStatusItem.variableLength); item.button?.title="▦ Control"
@@ -67,11 +88,20 @@ class Delegate: NSObject,NSApplicationDelegate {
   if (try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8)) == "Active" { perform("pause") }
  }
  @objc func urlEvent(_ event:NSAppleEventDescriptor,reply:NSAppleEventDescriptor) {
-  if let text=event.paramDescriptor(forKeyword:AEKeyword(keyDirectObject))?.stringValue, let action=URL(string:text)?.host, ["exit","pause","enter","four","six","new"].contains(action) {perform(action)}
+  if let text=event.paramDescriptor(forKeyword:AEKeyword(keyDirectObject))?.stringValue, let action=URL(string:text)?.host, ["exit","pause","enter","four","six","new","guide","center"].contains(action) {perform(action)}
  }
  @objc func selected(_ sender:NSMenuItem) { perform(sender.representedObject as! String) }
  func perform(_ action:String) {
-  if action=="guide" {NSWorkspace.shared.open(URL(fileURLWithPath:root+"/Guide.html"));return}
+  if action=="guide" {
+   if guide==nil {
+    let panel=GuidePanel(contentRect:NSRect(x:0,y:0,width:850,height:720),styleMask:[.titled,.closable,.resizable],backing:.buffered,defer:false)
+    panel.title="Terminal Shortcuts";panel.isReleasedWhenClosed=false
+    let web=WKWebView(frame:panel.contentView!.bounds);web.autoresizingMask=[.width,.height]
+    web.loadFileURL(URL(fileURLWithPath:root+"/Guide.html"),allowingReadAccessTo:URL(fileURLWithPath:root))
+    panel.contentView=web;guide=panel
+   }
+   guide?.center();guide?.makeKeyAndOrderFront(nil);NSApp.activate(ignoringOtherApps:true);return
+  }
   if action=="access" {
    let key=kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
    _=AXIsProcessTrustedWithOptions([key:true] as CFDictionary)

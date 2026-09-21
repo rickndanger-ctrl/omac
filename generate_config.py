@@ -22,6 +22,13 @@ cmd-shift-down = 'swap down'
 cmd-minus = 'resize smart -50'
 cmd-equal = 'resize smart +50'
 cmd-f = 'fullscreen'
+cmd-k = "exec-and-forget open 'agent-control-center://guide'"
+cmd-o = "exec-and-forget open 'agent-control-center://center'"
+cmd-t = 'layout floating tiling'
+cmd-alt-f = 'macos-native-fullscreen'
+alt-tab = 'focus --wrap-around dfs-next'
+alt-shift-tab = 'focus --wrap-around dfs-prev'
+cmd-shift-equal = 'balance-sizes'
 cmd-enter = "exec-and-forget open 'agent-control-center://new'"
 ctrl-alt-4 = "exec-and-forget open 'agent-control-center://four'"
 ctrl-alt-6 = "exec-and-forget open 'agent-control-center://six'"
@@ -44,6 +51,6 @@ app='/Applications/Agent Control Center.app/Contents/MacOS/AgentControlCenter'
 for name,args,keep in [
  ('menu',[app,'--managed'],{'PathState':{str(s/'menu.enabled'):True}}),
  ('aerospace',['/Applications/AeroSpace.app/Contents/MacOS/AeroSpace','--config-path',str(r/'config/aerospace.toml')],{'PathState':{str(s/'aerospace.enabled'):True}}),
- *[('terminal.'+role.lower(),['/usr/bin/open','-W','-n','-a','/Applications/Ghostty.app','--args','--title=ACC · '+role,'--working-directory='+str(Path.home()/'Documents')],False) for role in [str(i) for i in range(1,7)]]]:
+ *[('terminal.'+role.lower(),['/usr/bin/open','-W','-n','-a','/Applications/Ghostty.app','--args','--title=ACC · '+role,'--config-file='+str(r/'config/ghostty.conf'),'--working-directory='+str(Path.home()/'Documents')],False) for role in [str(i) for i in range(1,7)]]]:
  d={'Label':'com.richard.acc.'+name,'ProgramArguments':args,'RunAtLoad':False,'KeepAlive':keep,'ThrottleInterval':5,'EnvironmentVariables':env,'StandardOutPath':str(s/(name+'.log')),'StandardErrorPath':str(s/(name+'.error.log'))}
  (r/'launchd'/f'{name}.plist').write_bytes(plistlib.dumps(d))
