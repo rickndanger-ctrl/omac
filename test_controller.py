@@ -6,7 +6,7 @@ c=importlib.util.module_from_spec(spec);spec.loader.exec_module(c)
 class Lifecycle(unittest.TestCase):
  def setUp(self):
   self.tmp=tempfile.TemporaryDirectory();self.old=c.STATE;c.STATE=Path(self.tmp.name)
-  for name in ('save_pages','migrate_pages','restore_pages'):
+  for name in ('save_pages','migrate_pages','restore_pages','start_services'):
    patcher=patch.object(c,name);patcher.start();self.addCleanup(patcher.stop)
  def tearDown(self): c.STATE=self.old;self.tmp.cleanup()
  def test_reentry_does_not_launch_duplicates(self):
@@ -32,14 +32,14 @@ class Lifecycle(unittest.TestCase):
  def test_pause_preserves_sessions_and_snapshot(self):
   (c.STATE/'windows.json').write_text('[]')
   with patch.object(c,'aero') as aero,patch.object(c,'run') as run:
-   c.stop(False);run.assert_not_called()
+   c.stop(False);run.assert_called_once_with('launchctl','bootout',c.job('watcher'),check=False)
    self.assertTrue((c.STATE/'windows.json').exists())
    self.assertEqual(aero.call_args_list[-1].args,('enable','off'))
  def test_exit_only_stops_manager(self):
   with patch.object(c,'aero'),patch.object(c,'run') as run:
    c.stop(True)
-   self.assertEqual(run.call_args_list[0].args,('launchctl','bootout',c.job('aerospace')))
-   self.assertEqual(run.call_args_list[1].args,(c.APP,'--restore'))
+   run.assert_any_call('launchctl','bootout',c.job('aerospace'),check=False)
+   run.assert_any_call(c.APP,'--restore',check=False)
  def test_permission_failure_does_not_enable_manager(self):
   with patch.object(c,'aero',return_value=''),patch.object(c,'run',side_effect=RuntimeError('permission')):
    with self.assertRaises(RuntimeError):c.enter()
@@ -63,8 +63,8 @@ class Pages(unittest.TestCase):
  def test_restore_rejects_recycled_window_ids(self):
   import json
   with tempfile.TemporaryDirectory() as directory,patch.object(c,'STATE',Path(directory)):
-   (c.STATE/'pages.json').write_text(json.dumps({'page':'3','windows':[{'window-id':1,'app-pid':100,'workspace':'3'}]}))
-   with patch.object(c,'windows',return_value=[{'window-id':1,'app-pid':200}]),patch.object(c,'aero') as aero:
+   (c.STATE/'pages.json').write_text(json.dumps({'boot':'test','page':'3','windows':[{'window-id':1,'app-pid':100,'workspace':'3'}]}))
+   with patch.object(c,'boot_session',return_value='test'),patch.object(c,'windows',return_value=[{'window-id':1,'app-pid':200}]),patch.object(c,'aero') as aero:
     c.restore_pages()
     aero.assert_called_once_with('workspace','3')
 if __name__=='__main__':unittest.main()

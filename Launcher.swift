@@ -7,7 +7,11 @@ try? FileManager.default.createDirectory(at: state, withIntermediateDirectories:
 func process(_ executable: String, _ args: [String]) -> (Int32, String) {
  let p = Process(); p.executableURL = URL(fileURLWithPath: executable); p.arguments = args
  let pipe = Pipe(); p.standardOutput = pipe; p.standardError = pipe
- do { try p.run(); let data = pipe.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit(); return (p.terminationStatus, String(data: data, encoding: .utf8) ?? "") }
+ do { try p.run()
+  let timeout=DispatchWorkItem {if p.isRunning {p.terminate()}}
+  DispatchQueue.global().asyncAfter(deadline:.now()+30,execute:timeout)
+  defer {timeout.cancel()}
+  let data = pipe.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit(); return (p.terminationStatus, String(data: data, encoding: .utf8) ?? "") }
  catch { return (1,error.localizedDescription) }
 }
 func attribute(_ element: AXUIElement, _ key: String) -> CFTypeRef? {
@@ -65,6 +69,36 @@ if CommandLine.arguments.contains("--restore") {
  }
  exit(0)
 }
+func screenKey(_ screen:NSScreen)->String {
+ String((screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value ?? 0)
+}
+let wallpaperBackup=state.appendingPathComponent("wallpaper-original.json")
+let wallpaperChoice=state.appendingPathComponent("wallpaper.selected")
+if CommandLine.arguments.contains("--apply-wallpaper") || CommandLine.arguments.contains("--restore-wallpaper") {
+ let workspace=NSWorkspace.shared
+ var original=(try? Data(contentsOf:wallpaperBackup)).flatMap{try? JSONSerialization.jsonObject(with:$0) as? [String:String]} ?? [:]
+ let restoring=CommandLine.arguments.contains("--restore-wallpaper")
+ let choice=(try? String(contentsOf:wallpaperChoice,encoding:.utf8)) ?? "obsidian"
+ guard ["obsidian","amber","pine"].contains(choice) else {exit(1)}
+ let image=URL(fileURLWithPath:root+"/branding/wallpapers/omac-"+choice+".png")
+ var failed=false
+ for screen in NSScreen.screens {
+  let key=screenKey(screen)
+  if restoring {
+   guard let path=original[key] else {failed=true;continue}
+   do {try workspace.setDesktopImageURL(URL(fileURLWithPath:path),for:screen,options:[:])} catch {failed=true}
+  } else {
+   guard FileManager.default.fileExists(atPath:image.path) else {exit(1)}
+   if original[key]==nil,let old=workspace.desktopImageURL(for:screen) {original[key]=old.path}
+   // Persist before applying so Exit can always restore the original.
+   do {try JSONSerialization.data(withJSONObject:original).write(to:wallpaperBackup,options:.atomic)
+    try workspace.setDesktopImageURL(image,for:screen,options:[:])
+   } catch {failed=true}
+  }
+ }
+ if restoring && !failed {try? FileManager.default.removeItem(at:wallpaperBackup)}
+ exit(failed ? 1:0)
+}
 if CommandLine.arguments.contains("--guide") {
  let current=process("/opt/homebrew/bin/aerospace",["list-workspaces","--focused"])
  let page=current.1.trimmingCharacters(in:.whitespacesAndNewlines)
@@ -86,9 +120,9 @@ class Delegate: NSObject,NSApplicationDelegate {
  func applicationDidFinishLaunching(_ note:Notification) {
   NSAppleEventManager.shared().setEventHandler(self,andSelector:#selector(urlEvent(_:reply:)),forEventClass:AEEventClass(kInternetEventClass),andEventID:AEEventID(kAEGetURL))
   DistributedNotificationCenter.default().addObserver(self,selector:#selector(showGuideNotification(_:)),name:NSNotification.Name("com.richard.acc.showGuide"),object:nil,suspensionBehavior:.deliverImmediately)
-  item=NSStatusBar.system.statusItem(withLength:NSStatusItem.variableLength); item.button?.title="▦ Control"
+  item=NSStatusBar.system.statusItem(withLength:NSStatusItem.variableLength); item.button?.title="▦ Omac"
   let menu=NSMenu()
-  for (title,action) in [("Enter / Resume Five Pages","enter"),("Open / Arrange 4 Terminals","four"),("Open / Arrange 6 Terminals","six"),("New Terminal (up to 6)","new"),("Pause Tiling and Shortcuts","pause"),("Exit and Restore Windows","exit"),("Shortcut Guide","guide"),("Accessibility Settings","access"),("Quit Launcher","quit")] {
+  for (title,action) in [("Enter / Resume Five Pages","enter"),("Open / Arrange 4 Terminals","four"),("Open / Arrange 6 Terminals","six"),("New Terminal (up to 6)","new"),("Pause Tiling and Shortcuts","pause"),("Exit and Restore Windows","exit"),("Shortcut Guide","guide"),("Accessibility Settings","access"),("Start Omac at Login","enable-login"),("Disable Login Startup","disable-login"),("Quit Launcher","quit")] {
    let m=NSMenuItem(title:title,action:#selector(selected(_:)),keyEquivalent:""); m.representedObject=action; m.target=self; menu.addItem(m)
   }
   menu.addItem(.separator())
@@ -107,9 +141,16 @@ class Delegate: NSObject,NSApplicationDelegate {
    let entry=NSMenuItem(title:title,action:#selector(openSettings(_:)),keyEquivalent:"");entry.representedObject=url;entry.target=self;settingsMenu.addItem(entry)
   }
   settings.submenu=settingsMenu;menu.addItem(settings)
+  let appearance=NSMenuItem(title:"Omac Appearance",action:nil,keyEquivalent:"");let appearanceMenu=NSMenu()
+  for (title,value) in [("Green Glass Wallpaper","obsidian"),("Amber Glass Wallpaper","amber"),("Silver Glass Wallpaper","pine")] {
+   let entry=NSMenuItem(title:title,action:#selector(selectWallpaper(_:)),keyEquivalent:"");entry.representedObject=value;entry.target=self;appearanceMenu.addItem(entry)
+  }
+  let saver=NSMenuItem(title:"Screen Saver Settings…",action:#selector(openSettings(_:)),keyEquivalent:"")
+  saver.representedObject="x-apple.systempreferences:com.apple.ScreenSaver-Settings.extension";saver.target=self;appearanceMenu.addItem(saver)
+  appearance.submenu=appearanceMenu;menu.addItem(appearance)
   item.menu=menu
-  // Recover safely after a launcher crash: release management, preserve sessions.
-  if (try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8)) == "Active" { perform("pause") }
+  // Resume an active session after launchd restarts this menu helper.
+  if (try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8)) == "Active" { perform("enter") }
  }
  @objc func urlEvent(_ event:NSAppleEventDescriptor,reply:NSAppleEventDescriptor) {
   if let text=event.paramDescriptor(forKeyword:AEKeyword(keyDirectObject))?.stringValue, let action=URL(string:text)?.host, ["exit","pause","enter","four","six","new","guide","center"].contains(action) {perform(action)}
@@ -117,6 +158,13 @@ class Delegate: NSObject,NSApplicationDelegate {
  @objc func launchApp(_ sender:NSMenuItem) {
   guard let bundle=sender.representedObject as? String,let url=NSWorkspace.shared.urlForApplication(withBundleIdentifier:bundle) else {return}
   NSWorkspace.shared.openApplication(at:url,configuration:NSWorkspace.OpenConfiguration())
+ }
+ @objc func selectWallpaper(_ sender:NSMenuItem) {
+  guard let choice=sender.representedObject as? String else {return}
+  try? choice.write(to:wallpaperChoice,atomically:true,encoding:.utf8)
+  if (try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8))=="Active" {
+   DispatchQueue.global().async {_=process(CommandLine.arguments[0],["--apply-wallpaper"])}
+  }
  }
  @objc func openApplications() {NSWorkspace.shared.open(URL(fileURLWithPath:"/Applications"))}
  @objc func openSettings(_ sender:NSMenuItem) {
@@ -159,13 +207,14 @@ class Delegate: NSObject,NSApplicationDelegate {
    _=AXIsProcessTrustedWithOptions([key:true] as CFDictionary)
    NSWorkspace.shared.open(URL(string:"x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!); return
   }
+  if ["pause","exit","quit"].contains(action) {guide?.orderOut(nil)}
   guard !busy else {return}; busy=true; item.button?.title="▦ Working…"
   DispatchQueue.global().async {
    let result=process("/opt/homebrew/bin/python3",[root+"/control.py",action=="quit" ? "exit":action])
    DispatchQueue.main.async {
     self.busy=false
     let status=(try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8)) ?? "Inactive"
-    self.item.button?.title="▦ \(status)"
+    self.item.button?.title="▦ Omac · \(status)"
     if result.0 != 0 { let alert=NSAlert();alert.messageText="Control Center needs attention";alert.informativeText=result.1;NSApp.activate(ignoringOtherApps:true);alert.runModal() }
     if action=="quit" {try? FileManager.default.removeItem(at:state.appendingPathComponent("menu.enabled"));NSApp.terminate(nil)}
    }

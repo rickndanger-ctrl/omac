@@ -1,6 +1,6 @@
 config-version = 2
 start-at-login = false
-after-startup-command = []
+after-startup-command = ['exec-and-forget /opt/homebrew/bin/python3 "/Users/richardholguin/Documents/Codex/2026-09-20/is-x20/outputs/agent-control-center/control.py" recover']
 default-root-container-layout = 'tiles'
 default-root-container-orientation = 'horizontal'
 persistent-workspaces = ['1', '2', '3', '4', '5']

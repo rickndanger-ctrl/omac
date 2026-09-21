@@ -1,6 +1,7 @@
 #!/opt/homebrew/bin/python3
 """On-demand controller. No API calls, credentials, or background polling."""
 import fcntl,json,os,plistlib,subprocess,sys,time
+from functools import lru_cache
 from pathlib import Path
 ROOT=Path(__file__).resolve().parent
 STATE=Path.home()/'Library/Application Support/AgentControlCenter'
@@ -30,15 +31,26 @@ def windows():
 def page():
  value=aero('list-workspaces','--focused').strip()
  return value if value in ('1','2','3','4','5') else '1'
+@lru_cache(maxsize=1)
+def boot_session(): return run('/usr/sbin/sysctl','-n','kern.boottime')
+def status():
+ try: return (STATE/'status').read_text()
+ except FileNotFoundError: return 'Inactive'
 def save_pages():
- data={'page':page(),'windows':windows()}
+ data={'boot':boot_session(),'page':page(),'windows':windows()}
  temp=STATE/'pages.tmp';temp.write_text(json.dumps(data));temp.replace(STATE/'pages.json')
 def restore_pages():
  path=STATE/'pages.json'
  if not path.exists(): return
- data=json.loads(path.read_text());live={w['window-id']:w for w in windows()}
+ try:
+  data=json.loads(path.read_text())
+  if not isinstance(data,dict) or not isinstance(data.get('windows'),list): return
+ except (ValueError,OSError): return
+ if data.get('boot')!=boot_session(): return
+ live={w['window-id']:w for w in windows()}
  commands=[]
  for w in data['windows']:
+  if not isinstance(w,dict) or not isinstance(w.get('window-id'),int): continue
   current=live.get(w['window-id'])
   if not current or current.get('app-pid')!=w.get('app-pid'): continue
   target=w.get('workspace')
@@ -46,8 +58,15 @@ def restore_pages():
   commands.append(f"move-node-to-workspace --window-id {w['window-id']} {target}")
   layout='floating' if w.get('window-layout')=='floating' else 'h_tiles'
   commands.append(f"layout --window-id {w['window-id']} {layout}")
- if commands: aero('eval','; '.join(commands))
- aero('workspace',data.get('page','1'))
+ if commands:
+  aero('eval','; '.join(commands))
+  for workspace in ('1','2','3','4','5'):
+   saved=[w for w in data['windows'] if isinstance(w,dict) and w.get('workspace')==workspace]
+   terminals=[w for w in saved if w.get('app-name')=='Ghostty']
+   if len(terminals)>=3 and all(w.get('window-layout')!='floating' for w in terminals) and all(w.get('app-name')=='Ghostty' or w.get('window-layout')=='floating' for w in saved):
+    arrange(workspace)
+ target=data.get('page','1')
+ aero('workspace',target if target in ('1','2','3','4','5') else '1')
 def migrate_pages():
  for w in windows():
   if w.get('workspace')=='Terminals':
@@ -62,6 +81,7 @@ def ready():
 def save_status(value): (STATE/'status').write_text(value)
 
 def stop(restore=False):
+ run('launchctl','bootout',job('watcher'),check=False)
  try: save_pages()
  except (RuntimeError,ValueError): pass
  aero('mode','main',check=False)
@@ -71,6 +91,7 @@ def stop(restore=False):
   (STATE/'aerospace.enabled').unlink(missing_ok=True)
   run('launchctl','bootout',job('aerospace'),check=False)
   run(APP,'--restore',check=False)
+  run(APP,'--restore-wallpaper',check=False)
  return 'Windows and agent sessions remain open.'
 
 def terminal_windows(workspace=None):
@@ -107,6 +128,10 @@ def arrange(workspace=None):
  aero('eval','; '.join(commands))
  return len(tiles)
 
+def start_services():
+ load('watcher');run('launchctl','kickstart',job('watcher'))
+ run(APP,'--apply-wallpaper',check=False)
+
 def enter(count=0,add=False):
  existing=aero('config','--config-path',check=False)
  if existing and existing!=str(ROOT/'config/aerospace.toml'):
@@ -130,7 +155,6 @@ def enter(count=0,add=False):
   workspace=page()
   current=terminal_windows(workspace)
   if add: count=min(6,len(current)+1)
-  before={w['window-id'] for w in current}
   present={w['window-title'] for w in terminal_windows()}
   needed=max(0,count-len(current))
   expected=set(present)
@@ -168,16 +192,59 @@ def enter(count=0,add=False):
    total=len(current)
   save_status('Active')
   save_pages()
+  start_services()
   return f'{total} plain terminal windows tiled. No agents launched.'
  except Exception:
   stop(True)
+  raise
+
+def login():
+ # A separate RunAtLoad job runs once per GUI login; never launches agent commands.
+ marker=STATE/'login-boot'
+ if marker.exists() and marker.read_text()!=boot_session():
+  (STATE/'windows.json').unlink(missing_ok=True)
+ marker.write_text(boot_session())
+ save_status('Inactive')
+ (STATE/'menu.enabled').touch()
+ load('menu');run('launchctl','kickstart',job('menu'))
+ return enter()
+def login_enabled(enabled):
+ destination=Path.home()/'Library/LaunchAgents/com.richard.acc.login.plist'
+ if enabled:
+  destination.parent.mkdir(parents=True,exist_ok=True)
+  destination.write_bytes((ROOT/'launchd/login.plist').read_bytes())
+  if subprocess.run(['launchctl','print',job('login')],capture_output=True).returncode:
+   run('launchctl','bootstrap',DOMAIN,destination)
+  return 'Omac will start after macOS sign-in.'
+ run('launchctl','bootout',job('login'),check=False)
+ destination.unlink(missing_ok=True)
+ return 'Automatic start disabled.'
+def recover():
+ # Startup hook executes under the same lock as all window mutations.
+ previous=status()
+ if previous not in ('Active','Paused'): return 'No recovery needed.'
+ save_status('Recovering')
+ try:
+  ready();restore_pages()
+  if previous=='Active':
+   aero('mode','active');save_status('Active');save_pages()
+   load('watcher');run('launchctl','kickstart',job('watcher'))
+  else:
+   aero('mode','main');aero('enable','off');save_status('Paused')
+  return 'Recovered live page assignments.'
+ except Exception:
+  aero('mode','main',check=False);aero('enable','off',check=False);save_status('Paused')
   raise
 
 def main():
  action=sys.argv[1] if len(sys.argv)>1 else 'status'
  with (STATE/'controller.lock').open('w') as lock:
   fcntl.flock(lock,fcntl.LOCK_EX)
-  if action in ('enter','four','six','new'): print(enter(6 if action=='six' else (4 if action=='four' else 0),add=action=='new'))
+  if action=='login': print(login())
+  elif action=='enable-login': print(login_enabled(True))
+  elif action=='disable-login': print(login_enabled(False))
+  elif action=='recover': print(recover())
+  elif action in ('enter','four','six','new'): print(enter(6 if action=='six' else (4 if action=='four' else 0),add=action=='new'))
   elif action=='center':
    focused=json.loads(aero('list-windows','--focused','--json'))
    if not focused: raise RuntimeError('Focus a window first.')
@@ -201,6 +268,7 @@ def main():
   elif action in ('pause','exit'): print(stop(action=='exit'))
   elif action=='status': print((STATE/'status').read_text() if (STATE/'status').exists() else 'Inactive')
   elif action=='rollback':
+   login_enabled(False)
    stop(True)
    (STATE/'menu.enabled').unlink(missing_ok=True)
    run('launchctl','bootout',job('menu'),check=False)
