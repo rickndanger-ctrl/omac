@@ -289,7 +289,7 @@ class Delegate: NSObject,NSApplicationDelegate {
   if (try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8)) == "Active" { perform("enter") }
  }
  @objc func urlEvent(_ event:NSAppleEventDescriptor,reply:NSAppleEventDescriptor) {
-  if let text=event.paramDescriptor(forKeyword:AEKeyword(keyDirectObject))?.stringValue, let action=URL(string:text)?.host, ["exit","pause","enter","four","six","new","guide","menu","center"].contains(action) {perform(action)}
+  if let text=event.paramDescriptor(forKeyword:AEKeyword(keyDirectObject))?.stringValue, let action=URL(string:text)?.host, ["exit","pause","enter","four","six","new","guide","menu","center","rescue"].contains(action) {perform(action)}
  }
  @objc func selectPage(_ sender:NSMenuItem) { guard (try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8))=="Active" else{return};DispatchQueue.global().async {_=process(aerospace ?? "/missing/aerospace",["workspace",String(sender.tag)]);DispatchQueue.main.async{self.refreshBar()}} }
  @objc func launchApp(_ sender:NSMenuItem) {
@@ -333,6 +333,32 @@ class Delegate: NSObject,NSApplicationDelegate {
 
  }
  func perform(_ action:String) {
+  if action=="rescue" {
+   guard (try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8))=="Active" else {return}
+   guide?.orderOut(nil);item.menu?.cancelTracking()
+   let stack=CGWindowListCopyWindowInfo([.optionOnScreenOnly,.excludeDesktopElements],kCGNullWindowID) as? [[String:Any]] ?? []
+   DispatchQueue.global().async {
+    let current=process(aerospace ?? "/missing/aerospace",["list-workspaces","--focused"]).1.trimmingCharacters(in:.whitespacesAndNewlines)
+    guard ["1","2","3","4","5"].contains(current) else {return}
+    let result=process(aerospace ?? "/missing/aerospace",["list-windows","--workspace",current,"--format","%{window-id} %{app-pid} %{window-title} %{window-layout}","--json"])
+    guard result.0==0,let data=result.1.data(using:.utf8),let rows=(try? JSONSerialization.jsonObject(with:data)) as? [[String:Any]] else {return}
+    let candidates=rows.filter { ($0["app-pid"] as? Int) != Int(ProcessInfo.processInfo.processIdentifier) && ($0["window-layout"] as? String) != "macos_native_window_of_hidden_app" }
+    var target:[String:Any]?
+    for window in stack where (window[kCGWindowLayer as String] as? Int)==0 {
+     guard let pid=window[kCGWindowOwnerPID as String] as? Int else {continue}
+     let matches=candidates.filter {($0["app-pid"] as? Int)==pid}
+     if !matches.isEmpty {
+      let title=window[kCGWindowName as String] as? String
+      target=matches.first(where: { title != nil && ($0["window-title"] as? String)==title }) ?? matches.first
+      break
+     }
+    }
+    guard let chosen=target ?? candidates.first,let id=chosen["window-id"] as? Int else {return}
+    _=process(aerospace ?? "/missing/aerospace",["focus","--window-id",String(id)])
+   }
+   return
+  }
+
   if action=="menu" {
    guide?.orderOut(nil)
    guard let menu=item.menu else {return}
