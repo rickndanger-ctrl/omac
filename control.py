@@ -34,8 +34,19 @@ def status():
  try: return (STATE/'status').read_text()
  except FileNotFoundError: return 'Inactive'
 def save_pages():
- data={'boot':boot_session(),'page':page(),'windows':windows()}
- temp=STATE/'pages.tmp';temp.write_text(json.dumps(data));temp.replace(STATE/'pages.json')
+ current=windows()
+ path=STATE/'pages.json'
+ # AeroSpace temporarily reports an empty inventory while displays reconnect or
+ # macOS hides/minimizes every window. Keep the last useful page assignment so
+ # recovery and Command-Escape still have something authoritative to restore.
+ if not current and path.exists():
+  try:
+   previous=json.loads(path.read_text())
+   if isinstance(previous,dict) and previous.get('windows'): return False
+  except (ValueError,OSError): pass
+ data={'boot':boot_session(),'page':page(),'windows':current}
+ temp=STATE/'pages.tmp';temp.write_text(json.dumps(data));temp.replace(path)
+ return True
 def restore_pages():
  path=STATE/'pages.json'
  if not path.exists(): return

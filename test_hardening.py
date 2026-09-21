@@ -19,6 +19,12 @@ class Hardening(unittest.TestCase):
   with patch.object(c,'boot_session',return_value='same'),patch.object(c,'windows',return_value=rows),patch.object(c,'aero'),patch.object(c,'arrange') as arrange:
    c.restore_pages()
    arrange.assert_called_once_with('1')
+ def test_empty_inventory_does_not_erase_last_page_map(self):
+  previous={'boot':'same','page':'1','windows':[{'window-id':1,'app-pid':2,'workspace':'1'}]}
+  (c.STATE/'pages.json').write_text(json.dumps(previous))
+  with patch.object(c,'windows',return_value=[]):
+   self.assertFalse(c.save_pages())
+  self.assertEqual(json.loads((c.STATE/'pages.json').read_text()),previous)
  def test_active_recovery_restores_before_enabling_bindings(self):
   c.save_status('Active');events=[]
   with patch.object(c,'ready'),patch.object(c,'restore_pages',side_effect=lambda:events.append('restore')),patch.object(c,'aero',side_effect=lambda *args,**kw:events.append(args)),patch.object(c,'save_pages'),patch.object(c,'load'),patch.object(c,'run'):

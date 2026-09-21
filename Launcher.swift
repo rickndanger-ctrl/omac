@@ -337,23 +337,59 @@ class Delegate: NSObject,NSApplicationDelegate {
    guard (try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8))=="Active" else {return}
    guide?.orderOut(nil);item.menu?.cancelTracking()
    DispatchQueue.global().async {
-    // AeroSpace traverses tiled containers from their upper-left edge.
-    // Explicitly reactivate the application: selecting an already-focused node
-    // alone may leave keyboard input with a non-window UI surface.
-    let focused=process(aerospace ?? "/missing/aerospace",["focus","--dfs-index","0"])
-    guard focused.0==0 else {return}
-    let output=process(aerospace ?? "/missing/aerospace",["list-windows","--focused","--format","%{app-pid}"])
-    guard let pid=Int32(output.1.trimmingCharacters(in:.whitespacesAndNewlines)),pid != ProcessInfo.processInfo.processIdentifier else {return}
+    let aero=aerospace ?? "/missing/aerospace"
+    let current=process(aero,["list-workspaces","--focused"]).1.trimmingCharacters(in:.whitespacesAndNewlines)
+    guard ["1","2","3","4","5"].contains(current) else {return}
+    _=process(aero,["focus","--dfs-index","0"])
+    let output=process(aero,["list-windows","--focused","--format","%{app-pid}"])
+    var chosenPID=Int32(output.1.trimmingCharacters(in:.whitespacesAndNewlines))
+    var chosenWindow:AXUIElement?
+
+    // A minimized window disappears from AeroSpace's inventory. Fall back to
+    // the last non-empty page map, find that page's upper-left AX window, and
+    // unminimize it. This avoids needing a trackpad after Show Desktop or a
+    // display reconnect.
+    if chosenPID == nil,
+       let data=try? Data(contentsOf:state.appendingPathComponent("pages.json")),
+       let saved=(try? JSONSerialization.jsonObject(with:data)) as? [String:Any],
+       let rows=saved["windows"] as? [[String:Any]] {
+     var candidates:[(CGFloat,CGFloat,Int32,AXUIElement)]=[]
+     for row in rows where (row["workspace"] as? String)==current {
+      guard let rawPID=row["app-pid"] as? Int,rawPID != Int(ProcessInfo.processInfo.processIdentifier) else {continue}
+      let pid=Int32(rawPID),wanted=row["window-title"] as? String
+      let application=AXUIElementCreateApplication(pid);var listValue:CFTypeRef?
+      guard AXUIElementCopyAttributeValue(application,kAXWindowsAttribute as CFString,&listValue) == .success,
+            let list=listValue as? [AXUIElement] else {continue}
+      for window in list {
+       if let wanted=wanted,!wanted.isEmpty {
+        var titleValue:CFTypeRef?
+        _=AXUIElementCopyAttributeValue(window,kAXTitleAttribute as CFString,&titleValue)
+        guard (titleValue as? String)==wanted else {continue}
+       }
+       var point=CGPoint.zero,positionValue:CFTypeRef?
+       if AXUIElementCopyAttributeValue(window,kAXPositionAttribute as CFString,&positionValue) == .success,
+          let positionValue=positionValue,CFGetTypeID(positionValue)==AXValueGetTypeID() {
+        AXValueGetValue(unsafeBitCast(positionValue,to:AXValue.self),.cgPoint,&point)
+       }
+       candidates.append((point.y,point.x,pid,window))
+      }
+     }
+     if let first=candidates.sorted(by:{$0.0 == $1.0 ? $0.1 < $1.1 : $0.0 < $1.0}).first {
+      chosenPID=first.2;chosenWindow=first.3
+     }
+    }
+    guard let pid=chosenPID else {return}
     DispatchQueue.main.async {
      guard let target=NSRunningApplication(processIdentifier:pid) else {return}
-     target.activate(options:[.activateIgnoringOtherApps])
-     let application=AXUIElementCreateApplication(pid)
-     var value:CFTypeRef?
-     if AXUIElementCopyAttributeValue(application,kAXFocusedWindowAttribute as CFString,&value) == .success,let value=value {
-      let window=unsafeBitCast(value,to:AXUIElement.self)
+     let application=AXUIElementCreateApplication(pid);var window=chosenWindow
+     if window == nil {var value:CFTypeRef?;if AXUIElementCopyAttributeValue(application,kAXFocusedWindowAttribute as CFString,&value) == .success,let value=value {window=unsafeBitCast(value,to:AXUIElement.self)}}
+     if let window=window {
+      AXUIElementSetAttributeValue(window,kAXMinimizedAttribute as CFString,kCFBooleanFalse)
+      AXUIElementSetAttributeValue(application,kAXFocusedWindowAttribute as CFString,window)
       AXUIElementSetAttributeValue(window,kAXMainAttribute as CFString,kCFBooleanTrue)
       AXUIElementPerformAction(window,kAXRaiseAction as CFString)
      }
+     target.activate(options:[])
     }
    }
    return
