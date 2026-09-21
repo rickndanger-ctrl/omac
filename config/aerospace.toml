@@ -6,6 +6,11 @@ default-root-container-orientation = 'horizontal'
 persistent-workspaces = ['Terminals']
 [mode.main.binding]
 [mode.active.binding]
+cmd-alt-c = 'exec-and-forget open -a "Claude"'
+cmd-alt-h = 'exec-and-forget open -a "Hermes"'
+cmd-alt-g = 'exec-and-forget open -a "ChatGPT"'
+cmd-alt-b = 'exec-and-forget open -a "Google Chrome"'
+cmd-alt-e = 'exec-and-forget open -a "Finder"'
 cmd-left = 'focus --ignore-floating left'
 cmd-right = 'focus --ignore-floating right'
 cmd-up = 'focus --ignore-floating up'

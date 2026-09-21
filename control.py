@@ -57,24 +57,24 @@ def terminal_windows():
 
 def arrange():
  tiles=terminal_windows()
- for w in tiles:
-  wid=str(w['window-id'])
-  aero('move-node-to-workspace','--window-id',wid,'Terminals')
-  aero('layout','--window-id',wid,'tiling')
- aero('workspace','Terminals')
- if tiles:
-  aero('focus','--window-id',str(tiles[0]['window-id']))
-  aero('flatten-workspace-tree')
-  aero('layout','--workspace','Terminals','--root','h_tiles')
-  # Normalize physical order before pairing; titles need not match tree order.
-  for w in reversed(tiles):
-   for _ in tiles: aero('move','--window-id',str(w['window-id']),'left',check=False)
-  for i in range(1,len(tiles),2):
-   wid=str(tiles[i]['window-id'])
-   aero('join-with','--window-id',wid,'left')
-   aero('layout','--window-id',wid,'v_tiles')
-  aero('balance-sizes')
-  aero('focus','--window-id',str(tiles[0]['window-id']))
+ if not tiles: return 0
+ ids=[str(w['window-id']) for w in tiles]
+ focused=aero('list-windows','--focused','--format','%{window-id}',check=False)
+ target=focused if focused in ids else ids[0]
+ # One request avoids repainting between dozens of individual CLI invocations.
+ commands=[]
+ for wid in ids:
+  commands.extend([f'fullscreen off --window-id {wid}',
+                   f'move-node-to-workspace --window-id {wid} Terminals',
+                   f'layout --window-id {wid} tiling'])
+ commands.extend(['workspace Terminals',f'focus --window-id {ids[0]}',
+                  'flatten-workspace-tree','layout --workspace Terminals --root h_tiles'])
+ for wid in reversed(ids):
+  commands.extend([f'move --window-id {wid} left || true']*len(ids))
+ for i in range(1,len(ids),2):
+  commands.extend([f'join-with --window-id {ids[i]} left',f'layout --window-id {ids[i]} v_tiles'])
+ commands.extend(['balance-sizes --workspace Terminals',f'focus --window-id {target}'])
+ aero('eval','; '.join(commands))
  return len(tiles)
 
 def enter(count=4,add=False):

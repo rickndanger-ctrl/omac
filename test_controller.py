@@ -19,6 +19,14 @@ class Lifecycle(unittest.TestCase):
    self.assertIn('6 plain',c.enter(add=True))
    arrange.assert_not_called();run.assert_not_called()
    self.assertFalse(any(call.args[0]=='reload-config' for call in aero.call_args_list))
+ def test_grid_reset_is_one_batch_and_preserves_focus(self):
+  tiles=[{'window-id':i,'window-title':'ACC · '+str(i)} for i in range(1,7)]
+  with patch.object(c,'terminal_windows',return_value=tiles),patch.object(c,'aero',return_value='3') as aero:
+   self.assertEqual(c.arrange(),6)
+   batches=[call for call in aero.call_args_list if call.args[0]=='eval']
+   self.assertEqual(len(batches),1)
+   self.assertTrue(batches[0].args[1].endswith('focus --window-id 3'))
+   self.assertFalse(any(call.args[0]=='move' for call in aero.call_args_list))
  def test_pause_preserves_sessions_and_snapshot(self):
   (c.STATE/'windows.json').write_text('[]')
   with patch.object(c,'aero') as aero,patch.object(c,'run') as run:
