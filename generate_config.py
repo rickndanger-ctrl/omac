@@ -1,6 +1,6 @@
 from pathlib import Path
 import plistlib,shlex
-r=Path('outputs/agent-control-center').resolve()
+r=Path(__file__).resolve().parent
 s=Path.home()/'Library/Application Support/AgentControlCenter'
 s.mkdir(parents=True,exist_ok=True)
 config='''config-version = 2

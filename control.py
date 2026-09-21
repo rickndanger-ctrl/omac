@@ -70,6 +70,9 @@ def enter():
    ws=windows()
    if all(any(w.get('window-title','')=='ACC · '+r for w in ws) for r in ROLES): break
    time.sleep(.25)
+  missing=[r for r in ROLES if not any(w.get('window-title','')=='ACC · '+r for w in windows())]
+  if missing:
+   raise RuntimeError('Terminal windows did not appear: '+', '.join(missing)+'. Open Ghostty manually to resolve any first-launch prompt, then retry Enter.')
   agents=[]
   for w in windows():
    title=w.get('window-title',''); app=w.get('app-name',''); wid=str(w['window-id'])
