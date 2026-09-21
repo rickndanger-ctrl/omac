@@ -25,8 +25,9 @@ final class OmacRendererView: NSView {
 
     override var isFlipped: Bool { true }
 
-    init(frame frameRect: NSRect, reduceMotion: Bool? = nil) {
+    init(frame frameRect: NSRect, reduceMotion: Bool? = nil, initialPhase: Double = 0) {
         self.reduceMotion = reduceMotion ?? NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        self.phase = initialPhase
         super.init(frame: frameRect)
         wantsLayer = true
         rebuildStream()
@@ -58,7 +59,7 @@ final class OmacRendererView: NSView {
         let now = Date()
         let delta = min(now.timeIntervalSince(lastTick), 0.2)
         lastTick = now
-        phase += delta * (reduceMotion ? 0.08 : 0.65)
+        phase += delta * (reduceMotion ? 0.08 : 1.0)
         if !reduceMotion && Int(phase * 10) % 7 == 0 { rebuildStream() }
         needsDisplay = true
     }
@@ -95,12 +96,12 @@ final class OmacRendererView: NSView {
 
         // Four short terminal moods repeat: rain, scan, cursor, and glitch.
         // Each is deterministic so the saver stays calm and cheap to render.
-        let effect = reduceMotion ? 0 : Int(phase / 3.0) % 4
-        let effectProgress = reduceMotion ? 0.0 : phase.truncatingRemainder(dividingBy: 3.0) / 3.0
+        let effect = reduceMotion ? 0 : Int(phase / 8.0) % 4
+        let effectProgress = reduceMotion ? 0.0 : phase.truncatingRemainder(dividingBy: 8.0) / 8.0
 
         for (index, line) in stream.enumerated() {
             let y = 18 + CGFloat(index) * (smallFont.pointSize + 8)
-            let alpha = effect == 0 ? 0.08 + CGFloat((index % 3)) * 0.025 : 0.035 + CGFloat((index % 2)) * 0.018
+            let alpha = effect == 0 ? 0.14 + CGFloat((index % 3)) * 0.035 : 0.045 + CGFloat((index % 2)) * 0.018
             (line as NSString).draw(at: CGPoint(x: 24, y: y), withAttributes: [
                 .font: smallFont,
                 .foregroundColor: NSColor(calibratedRed: 0.48, green: 0.72, blue: 0.34, alpha: alpha)
@@ -109,7 +110,7 @@ final class OmacRendererView: NSView {
 
         if effect == 1 {
             let scanY = bounds.height * CGFloat(effectProgress)
-            context.setFillColor(NSColor(calibratedRed: 0.60, green: 0.85, blue: 0.40, alpha: 0.10).cgColor)
+            context.setFillColor(NSColor(calibratedRed: 0.15, green: 0.85, blue: 0.95, alpha: 0.22).cgColor)
             context.fill(CGRect(x: 0, y: scanY, width: bounds.width, height: max(1, fontSize * 0.08)))
         } else if effect == 2 {
             let cursor = "▌"
@@ -117,12 +118,37 @@ final class OmacRendererView: NSView {
                 .font: font,
                 .foregroundColor: NSColor(calibratedRed: 0.60, green: 0.85, blue: 0.40, alpha: effectProgress < 0.5 ? 0.8 : 0.15)
             ])
+            context.setLineWidth(max(1, fontSize * 0.10))
+            context.setStrokeColor(NSColor(calibratedRed: 0.2, green: 0.85, blue: 1, alpha: 0.75).cgColor)
+            for bolt in 0..<3 {
+                let path = CGMutablePath()
+                let travel = CGFloat(effectProgress) * logoWidth
+                let x = origin.x + CGFloat(bolt + 1) * logoWidth / 4 + travel * (bolt == 1 ? -0.35 : 0.18)
+                path.move(to: CGPoint(x: x - 24, y: origin.y - 12))
+                path.addLine(to: CGPoint(x: x - 8, y: origin.y + logoHeight * 0.35))
+                path.addLine(to: CGPoint(x: x + 5, y: origin.y + logoHeight * 0.32))
+                path.addLine(to: CGPoint(x: x - 4, y: origin.y + logoHeight + 10))
+                context.addPath(path)
+                context.strokePath()
+            }
+            let sparkX = origin.x + logoWidth * CGFloat(effectProgress)
+            let sparkY = origin.y + logoHeight * (0.25 + 0.5 * CGFloat(sin(effectProgress * .pi)))
+            context.setFillColor(NSColor(calibratedRed: 1, green: 0.55, blue: 0.08, alpha: 0.95).cgColor)
+            context.fillEllipse(in: CGRect(x: sparkX - fontSize * 0.16, y: sparkY - fontSize * 0.16, width: fontSize * 0.32, height: fontSize * 0.32))
+        } else if effect == 3 {
+            context.setFillColor(NSColor(calibratedRed: 0.95, green: 0.55, blue: 0.12, alpha: 0.55).cgColor)
+            for particle in 0..<28 {
+                let seed = CGFloat((particle * 37) % 101) / 100
+                let x = bounds.midX + (seed - 0.5) * bounds.width * (0.3 + effectProgress * 1.3)
+                let y = bounds.midY + CGFloat(sin(Double(particle) * 2.7 + phase)) * bounds.height * 0.35
+                context.fillEllipse(in: CGRect(x: x, y: y, width: max(1, fontSize * 0.12), height: max(1, fontSize * 0.12)))
+            }
         }
 
         let cycle = reduceMotion ? 1.0 : phase.truncatingRemainder(dividingBy: 12.0) / 12.0
         for (index, line) in logo.enumerated() {
             let wobble = reduceMotion ? 0 : sin(phase + Double(index) * 0.7) * (effect == 3 ? 2.8 : 1.2)
-            let color = NSColor(calibratedRed: 0.60, green: 0.85, blue: 0.40, alpha: 0.94)
+            let baseHue = effect == 0 ? 0.27 : effect == 1 ? 0.76 : effect == 2 ? 0.56 : 0.10
             let reveal: Double
             if reduceMotion || cycle >= 0.17 && cycle < 0.67 { reveal = 1 }
             else if cycle < 0.17 { reveal = cycle / 0.17 }
@@ -131,10 +157,14 @@ final class OmacRendererView: NSView {
                 let cell = Double((index * 53 + column * 29) % 97) / 97.0
                 return cell <= reveal ? String(character) : " "
             }.joined()
-            (assembled as NSString).draw(at: CGPoint(x: origin.x + CGFloat(wobble), y: origin.y + CGFloat(index) * lineHeight), withAttributes: [
-                .font: font,
-                .foregroundColor: color
-            ])
+            let cellWidth = "█".size(withAttributes: [.font: font]).width
+            for (column, character) in assembled.enumerated() where character != " " {
+                let hue = (baseHue + Double(column) * 0.018 + phase * 0.025).truncatingRemainder(dividingBy: 1)
+                let color = NSColor(hue: CGFloat(hue), saturation: 0.78, brightness: 0.98, alpha: 0.96)
+                let glyph = String(character) as NSString
+                let x = origin.x + CGFloat(column) * cellWidth + CGFloat(wobble)
+                glyph.draw(at: CGPoint(x: x, y: origin.y + CGFloat(index) * lineHeight), withAttributes: [.font: font, .foregroundColor: color])
+            }
             if effect == 3 && index % 3 == 0 {
                 let ghost = String(assembled.dropFirst(min(2, assembled.count)))
                 (ghost as NSString).draw(at: CGPoint(x: origin.x - 2, y: origin.y + CGFloat(index) * lineHeight), withAttributes: [

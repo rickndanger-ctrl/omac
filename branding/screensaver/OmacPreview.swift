@@ -11,7 +11,11 @@ final class PreviewController: NSObject, NSApplicationDelegate {
         window = NSWindow(contentRect: frame, styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         window.title = "OMAC Screensaver Preview"
         window.isReleasedWhenClosed = false
-        window.contentView = OmacRendererView(frame: NSRect(origin: .zero, size: size))
+        let scene = CommandLine.arguments.firstIndex(of: "--scene").flatMap { index in
+            index + 1 < CommandLine.arguments.count ? Int(CommandLine.arguments[index + 1]) : nil
+        }
+        let initialPhase = Double(max(0, min(3, scene ?? 0))) * 8.0
+        window.contentView = OmacRendererView(frame: NSRect(origin: .zero, size: size), initialPhase: initialPhase)
         window.makeKeyAndOrderFront(nil)
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             if event.keyCode == 53 { NSApp.terminate(nil); return nil }
