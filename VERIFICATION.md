@@ -65,3 +65,4 @@ Six-terminal reset completed in 0.167 seconds with the same window IDs. Seven te
 - Live restart tests for menu, watcher, and AeroSpace preserved all 23 window ID/PID pairs and their workspace memberships; focus remained page 1.
 - Native screensaver preview rendered; installed saver is listed in System Settings. Idle activation and native selection are not yet confirmed.
 - Actual reboot, sleep/wake and alternate physical display configurations remain untested.
+- Disengage and re-engage live run preserved all 24 window ID/PID pairs (zero lost) and returned Active. This includes the temporary Settings sheet; no agents were stopped.
