@@ -341,10 +341,11 @@ class Delegate: NSObject,NSApplicationDelegate {
     let current=process(aero,["list-workspaces","--focused"]).1.trimmingCharacters(in:.whitespacesAndNewlines)
     guard ["1","2","3","4","5"].contains(current) else {return}
     _=process(aero,["focus","--dfs-index","0"])
-    let output=process(aero,["list-windows","--focused","--format","%{app-pid} %{window-layout}"])
+    let output=process(aero,["list-windows","--focused","--format","%{window-id} %{app-pid} %{window-layout}"])
     let fields=output.1.split(separator:" ").map(String.init)
     let excludedLayouts=["floating","macos_native_window_of_hidden_app","macos_fullscreen"]
-    var chosenPID=(fields.count >= 2 && !excludedLayouts.contains(fields[1])) ? Int32(fields[0]) : nil
+    var chosenID=(fields.count >= 3 && !excludedLayouts.contains(fields[2])) ? Int(fields[0]) : nil
+    var chosenPID=(fields.count >= 3 && !excludedLayouts.contains(fields[2])) ? Int32(fields[1]) : nil
     var chosenWindow:AXUIElement?
 
     // A minimized window disappears from AeroSpace's inventory. Fall back to
@@ -357,6 +358,7 @@ class Delegate: NSObject,NSApplicationDelegate {
        let rows=saved["windows"] as? [[String:Any]] {
      var candidates:[(CGFloat,CGFloat,Int32,AXUIElement)]=[]
      for row in rows where (row["workspace"] as? String)==current {
+      if excludedLayouts.contains(row["window-layout"] as? String ?? "") {continue}
       guard let rawPID=row["app-pid"] as? Int,rawPID != Int(ProcessInfo.processInfo.processIdentifier) else {continue}
       let pid=Int32(rawPID),wanted=row["window-title"] as? String
       let application=AXUIElementCreateApplication(pid);var listValue:CFTypeRef?
@@ -377,7 +379,7 @@ class Delegate: NSObject,NSApplicationDelegate {
       }
      }
      if let first=candidates.sorted(by:{$0.0 == $1.0 ? $0.1 < $1.1 : $0.0 < $1.0}).first {
-      chosenPID=first.2;chosenWindow=first.3
+      chosenID=nil;chosenPID=first.2;chosenWindow=first.3
      }
     }
     guard let pid=chosenPID else {return}
@@ -392,6 +394,8 @@ class Delegate: NSObject,NSApplicationDelegate {
       AXUIElementPerformAction(window,kAXRaiseAction as CFString)
      }
      target.activate(options:[])
+     _=process(aero,["workspace",current])
+     if let id=chosenID {_=process(aero,["focus","--window-id",String(id)])}
     }
    }
    return
