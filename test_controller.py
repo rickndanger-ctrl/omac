@@ -23,7 +23,11 @@ class Lifecycle(unittest.TestCase):
    self.assertFalse(any(call.args[0]=='reload-config' for call in aero.call_args_list))
  def test_grid_reset_is_one_batch_and_preserves_focus(self):
   tiles=[{'window-id':i,'window-title':'ACC · '+str(i)} for i in range(1,7)]
-  with patch.object(c,'terminal_windows',return_value=tiles),patch.object(c,'windows',return_value=list(reversed(tiles))),patch.object(c,'aero',return_value='3') as aero:
+  cursor=['3']
+  def fake_aero(*args,**kwargs):
+   if args[:2]==('focus','--dfs-index'):cursor[0]=str(6-int(args[2]))
+   return cursor[0]
+  with patch.object(c,'terminal_windows',return_value=tiles),patch.object(c,'windows',return_value=list(reversed(tiles))),patch.object(c,'aero',side_effect=fake_aero) as aero:
    self.assertEqual(c.arrange(),6)
    batches=[call for call in aero.call_args_list if call.args[0]=='eval']
    self.assertEqual(len(batches),1)

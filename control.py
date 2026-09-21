@@ -119,7 +119,11 @@ def arrange(workspace=None):
                   'flatten-workspace-tree',f'layout --workspace {workspace} --root h_tiles'])
  aero('eval','; '.join(commands))
  # Query the actual tree order after flattening; title order need not match it.
- ordered=[str(w['window-id']) for w in windows() if str(w['window-id']) in ids]
+ ordered=[]
+ for index in range(len(windows())):
+  aero('focus','--dfs-index',str(index),check=False)
+  wid=aero('list-windows','--focused','--format','%{window-id}',check=False)
+  if wid in ids and wid not in ordered: ordered.append(wid)
  for i in range(0,len(ordered)-1,2):
   aero('join-with','--window-id',ordered[i],'right')
  aero('balance-sizes','--workspace',workspace)
