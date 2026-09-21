@@ -249,7 +249,7 @@ final class OmacMenuPanel: NSPanel {
         contentView = root
         let desiredRowsHeight = stack.fittingSize.height
         let screen = screenFor(anchor: anchor)
-        let maximumHeight = max(150, screen.visibleFrame.height - 32)
+        let maximumHeight = min(640, max(150, screen.visibleFrame.height - 32))
         let height = min(maximumHeight, chromeHeight + desiredRowsHeight)
         setContentSize(NSSize(width: panelWidth, height: height))
         position(on: screen, anchor: anchor)
@@ -303,6 +303,7 @@ final class OmacMenuPanel: NSPanel {
         button.tag = index
         button.translatesAutoresizingMaskIntoConstraints = false
         button.heightAnchor.constraint(equalToConstant: rowHeight).isActive = true
+        button.widthAnchor.constraint(equalToConstant: panelWidth - 14).isActive = true
         button.isBordered = false
         button.bezelStyle = .regularSquare
         button.alignment = .left
