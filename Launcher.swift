@@ -123,7 +123,7 @@ class Delegate: NSObject,NSApplicationDelegate {
    if guide==nil {
     let panel=GuidePanel(contentRect:NSRect(x:0,y:0,width:620,height:570),styleMask:[.titled,.closable,.fullSizeContentView],backing:.buffered,defer:false)
     panel.title="Shortcuts";panel.titleVisibility = .hidden;panel.titlebarAppearsTransparent=true
-    panel.isReleasedWhenClosed=false;panel.isOpaque=false;panel.hasShadow=true
+    panel.isReleasedWhenClosed=false;panel.isOpaque=false;panel.hasShadow=true;panel.hidesOnDeactivate=false
     panel.backgroundColor=NSColor(calibratedRed:0.08,green:0.10,blue:0.13,alpha:0.85)
     panel.appearance=NSAppearance(named:.darkAqua)
     let web=WKWebView(frame:panel.contentView!.bounds);web.autoresizingMask=[.width,.height]
@@ -140,7 +140,7 @@ class Delegate: NSObject,NSApplicationDelegate {
    DispatchQueue.main.asyncAfter(deadline:.now()+0.15) {
     if current.0==0 {
      let moved=process("/opt/homebrew/bin/aerospace",["move-node-to-workspace","--window-id",String(panel.windowNumber),page])
-     if moved.0 != 0 {panel.orderOut(nil);return}
+     if moved.0 != 0 {NSLog("Guide move failed: %@",moved.1);return}
      _=process("/opt/homebrew/bin/aerospace",["layout","--window-id",String(panel.windowNumber),"floating"])
      _=process("/opt/homebrew/bin/aerospace",["focus","--window-id",String(panel.windowNumber)])
     }
