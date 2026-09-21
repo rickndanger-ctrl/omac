@@ -15,6 +15,7 @@ final class OmacIdleOverlayController: NSObject, NSApplicationDelegate, NSWindow
             window.delegate = self
             window.contentView = OverlayContentView(frame: NSRect(origin: .zero, size: screen.frame.size),
                                                       dismiss: { [weak self] in self?.dismissAll() })
+            window.contentView?.layoutSubtreeIfNeeded()
             window.level = NSWindow.Level.normal
             window.collectionBehavior = [NSWindow.CollectionBehavior.canJoinAllSpaces,
                                          NSWindow.CollectionBehavior.fullScreenAuxiliary]
@@ -67,19 +68,31 @@ final class OverlayContentView: NSView {
         renderer = OmacRendererView(frame: frame)
         super.init(frame: frame)
         wantsLayer = true
+        renderer.wantsLayer = true
+        renderer.layer?.zPosition = 0
         renderer.autoresizingMask = [.width, .height]
         addSubview(renderer)
         button.target = self
         button.action = #selector(returnToDesktop)
         button.bezelStyle = .rounded
         button.keyEquivalent = "\r"
-        button.frame = NSRect(x: max(16, bounds.width - 182), y: 28, width: 150, height: 34)
+        button.isBordered = true
+        button.font = .systemFont(ofSize: 14, weight: .semibold)
+        button.frame = NSRect(x: 0, y: 0, width: 150, height: 34)
         button.autoresizingMask = [.minXMargin, .maxYMargin]
         button.contentTintColor = .white
-        addSubview(button)
+        button.wantsLayer = true
+        button.layer?.zPosition = 10
+        addSubview(button, positioned: .above, relativeTo: renderer)
     }
 
     required init?(coder: NSCoder) { nil }
+
+    override func layout() {
+        super.layout()
+        renderer.frame = bounds
+        button.frame = NSRect(x: max(16, bounds.width - 182), y: 28, width: 150, height: 34)
+    }
 
     @objc private func returnToDesktop() { dismiss() }
 
