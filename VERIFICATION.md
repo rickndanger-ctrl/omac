@@ -29,3 +29,13 @@ Live center action changed the focused terminal from tiled to floating, then bac
 
 ## Batched layouts and app shortcuts
 Six-terminal reset completed in 0.167 seconds with the same window IDs. Seven tests pass, including one-batch layout and focus preservation. All five shortcut dispatches accepted; Claude, Hermes, Chrome, and Finder observed running. ChatGPT app-name ambiguity identified: ChatGPT.app is com.openai.codex, so the ChatGPT desktop shortcut targets ChatGPT Classic.app (com.openai.chat).
+
+## Five-page update — 2026-09-21
+- Ten controller tests pass; AeroSpace dry-run accepts generated configuration.
+- Live trigger-binding checks passed for Command–1…5, and Command–Shift–2/3 moving the new page-2 terminal.
+- Page switches preserved all existing window IDs and membership. Page 2 has one new empty terminal; pages 3–5 remain empty.
+- Pause/Resume and orderly Exit/re-entry preserved window IDs and page membership without duplicate terminals.
+- Finder and Ghostty tiled together on page 2 and survived switching away/back. Finder returned to its original page afterward.
+- Fixed a real restore defect: generic `tiling` could return accordion stacks; explicit `h_tiles` passed the repeated lifecycle test. Page 1 was reset to the six-terminal grid afterward.
+- No Ghostty processes were restarted or agents launched. Usage remained 41% at checkpoints.
+- Not fully verified: physical key interception, visual transition quality, every app's minimum sizing, sleep/wake, multiple displays, abrupt AeroSpace crash recovery. Page assignments after abrupt crashes are not guaranteed. Exact nested tile trees are not persisted across Exit.
