@@ -81,19 +81,23 @@ def enter(count=4,add=False):
  existing=aero('config','--config-path',check=False)
  if existing and existing!=str(ROOT/'config/aerospace.toml'):
   raise RuntimeError('Another AeroSpace configuration is active. Exit it before entering Control Center.')
- run(APP,'--snapshot')
- (STATE/'aerospace.enabled').touch()
- load('aerospace')
- run('launchctl','kickstart',job('aerospace'))
+ active=existing==str(ROOT/'config/aerospace.toml') and (STATE/'status').exists() and (STATE/'status').read_text()=='Active'
+ if not active:
+  run(APP,'--snapshot')
+  (STATE/'aerospace.enabled').touch()
+  load('aerospace')
+  run('launchctl','kickstart',job('aerospace'))
  try:
-  ready()
+  if not active: ready()
   if aero('config','--config-path')!=str(ROOT/'config/aerospace.toml'):
    raise RuntimeError('A different AeroSpace instance is running.')
-  aero('reload-config')
-  aero('enable','on')
-  aero('mode','active')
+  if not active:
+   aero('reload-config')
+   aero('enable','on')
+   aero('mode','active')
   current=terminal_windows()
   if add: count=min(6,len(current)+1)
+  before={w['window-id'] for w in current}
   present={w['window-title'] for w in current}
   needed=max(0,count-len(current))
   expected=set(present)
@@ -109,7 +113,20 @@ def enter(count=4,add=False):
    time.sleep(.25)
   missing=expected-{w['window-title'] for w in terminal_windows()}
   if missing: raise RuntimeError('Terminal windows did not appear: '+', '.join(sorted(missing))+'. Resolve any Ghostty first-launch prompt and retry.')
-  total=arrange()
+  if add and active:
+   # Insert only new windows; preserve current sizes, positions and fullscreen state.
+   all_tiles=terminal_windows()
+   added=[w for w in all_tiles if w['window-id'] not in before]
+   for w in added:
+    wid=str(w['window-id'])
+    aero('move-node-to-workspace','--window-id',wid,'Terminals')
+    aero('layout','--window-id',wid,'tiling')
+   if added:
+    aero('workspace','Terminals')
+    aero('focus','--window-id',str(added[-1]['window-id']))
+   total=len(all_tiles)
+  else:
+   total=arrange()
   save_status('Active')
   return f'{total} plain terminal windows tiled. No agents launched.'
  except Exception:
