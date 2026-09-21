@@ -69,6 +69,7 @@ if CommandLine.arguments.contains("--guide") {
  let current=process("/opt/homebrew/bin/aerospace",["list-workspaces","--focused"])
  let page=current.1.trimmingCharacters(in:.whitespacesAndNewlines)
  DistributedNotificationCenter.default().postNotificationName(NSNotification.Name("com.richard.acc.showGuide"),object:nil,userInfo:["page":current.0==0 ? page:""],deliverImmediately:true)
+ RunLoop.current.run(until:Date(timeIntervalSinceNow:0.15))
  exit(0)
 }
 if !CommandLine.arguments.contains("--managed") {
@@ -84,7 +85,7 @@ class Delegate: NSObject,NSApplicationDelegate {
  var item:NSStatusItem!; var busy=false; var guide:GuidePanel?
  func applicationDidFinishLaunching(_ note:Notification) {
   NSAppleEventManager.shared().setEventHandler(self,andSelector:#selector(urlEvent(_:reply:)),forEventClass:AEEventClass(kInternetEventClass),andEventID:AEEventID(kAEGetURL))
-  DistributedNotificationCenter.default().addObserver(self,selector:#selector(showGuideNotification(_:)),name:NSNotification.Name("com.richard.acc.showGuide"),object:nil)
+  DistributedNotificationCenter.default().addObserver(self,selector:#selector(showGuideNotification(_:)),name:NSNotification.Name("com.richard.acc.showGuide"),object:nil,suspensionBehavior:.deliverImmediately)
   item=NSStatusBar.system.statusItem(withLength:NSStatusItem.variableLength); item.button?.title="▦ Control"
   let menu=NSMenu()
   for (title,action) in [("Enter / Resume Five Pages","enter"),("Open / Arrange 4 Terminals","four"),("Open / Arrange 6 Terminals","six"),("New Terminal (up to 6)","new"),("Pause Tiling and Shortcuts","pause"),("Exit and Restore Windows","exit"),("Shortcut Guide","guide"),("Accessibility Settings","access"),("Quit Launcher","quit")] {
