@@ -8,7 +8,7 @@ STATE.mkdir(parents=True,exist_ok=True)
 DOMAIN=f'gui/{os.getuid()}'
 AERO='/opt/homebrew/bin/aerospace'
 APP='/Applications/Agent Control Center.app/Contents/MacOS/AgentControlCenter'
-ROLES=[str(i) for i in range(1,7)]
+ROLES=[str(i) for i in range(1,31)]
 
 def run(*args,check=True):
  p=subprocess.run([str(a) for a in args],capture_output=True,text=True,timeout=30)
@@ -25,7 +25,34 @@ def load(name):
   p.returncode=1
  if p.returncode: run('launchctl','bootstrap',DOMAIN,ROOT/'launchd'/f'{name}.plist')
 
-def windows(): return json.loads(aero('list-windows','--all','--json'))
+def windows():
+ return json.loads(aero('list-windows','--all','--format','%{window-id} %{app-pid} %{app-name} %{window-title} %{workspace} %{window-layout}','--json'))
+def page():
+ value=aero('list-workspaces','--focused').strip()
+ return value if value in ('1','2','3','4','5') else '1'
+def save_pages():
+ data={'page':page(),'windows':windows()}
+ temp=STATE/'pages.tmp';temp.write_text(json.dumps(data));temp.replace(STATE/'pages.json')
+def restore_pages():
+ path=STATE/'pages.json'
+ if not path.exists(): return
+ data=json.loads(path.read_text());live={w['window-id']:w for w in windows()}
+ commands=[]
+ for w in data['windows']:
+  current=live.get(w['window-id'])
+  if not current or current.get('app-pid')!=w.get('app-pid'): continue
+  target=w.get('workspace')
+  if target not in ('1','2','3','4','5'): continue
+  commands.append(f"move-node-to-workspace --window-id {w['window-id']} {target}")
+  layout='floating' if w.get('window-layout')=='floating' else 'tiling'
+  commands.append(f"layout --window-id {w['window-id']} {layout}")
+ if commands: aero('eval','; '.join(commands))
+ aero('workspace',data.get('page','1'))
+def migrate_pages():
+ for w in windows():
+  if w.get('workspace')=='Terminals':
+   aero('move-node-to-workspace','--window-id',str(w['window-id']),'1')
+
 def ready():
  for _ in range(30):
   try:
@@ -35,6 +62,8 @@ def ready():
 def save_status(value): (STATE/'status').write_text(value)
 
 def stop(restore=False):
+ try: save_pages()
+ except (RuntimeError,ValueError): pass
  aero('mode','main',check=False)
  aero('enable','off',check=False)
  save_status('Paused' if not restore else 'Inactive')
@@ -44,10 +73,10 @@ def stop(restore=False):
   run(APP,'--restore',check=False)
  return 'Windows and agent sessions remain open.'
 
-def terminal_windows():
+def terminal_windows(workspace=None):
  result=[]
  for w in windows():
-  if w.get('app-name')!='Ghostty': continue
+  if w.get('app-name')!='Ghostty' or (workspace is not None and w.get('workspace')!=workspace): continue
   title=w.get('window-title','')
   for role in ROLES:
    canonical='ACC · '+role
@@ -55,8 +84,9 @@ def terminal_windows():
     result.append(dict(w,**{'window-title':canonical})); break
  return sorted(result,key=lambda w:(w['window-title'],w['window-id']))
 
-def arrange():
- tiles=terminal_windows()
+def arrange(workspace=None):
+ workspace=workspace or page()
+ tiles=terminal_windows(workspace)
  if not tiles: return 0
  ids=[str(w['window-id']) for w in tiles]
  focused=aero('list-windows','--focused','--format','%{window-id}',check=False)
@@ -65,19 +95,19 @@ def arrange():
  commands=[]
  for wid in ids:
   commands.extend([f'fullscreen off --window-id {wid}',
-                   f'move-node-to-workspace --window-id {wid} Terminals',
+                   f'move-node-to-workspace --window-id {wid} {workspace}',
                    f'layout --window-id {wid} tiling'])
- commands.extend(['workspace Terminals',f'focus --window-id {ids[0]}',
-                  'flatten-workspace-tree','layout --workspace Terminals --root h_tiles'])
+ commands.extend([f'workspace {workspace}',f'focus --window-id {ids[0]}',
+                  'flatten-workspace-tree',f'layout --workspace {workspace} --root h_tiles'])
  for wid in reversed(ids):
   commands.extend([f'move --window-id {wid} left || true']*len(ids))
  for i in range(1,len(ids),2):
   commands.extend([f'join-with --window-id {ids[i]} left',f'layout --window-id {ids[i]} v_tiles'])
- commands.extend(['balance-sizes --workspace Terminals',f'focus --window-id {target}'])
+ commands.extend([f'balance-sizes --workspace {workspace}',f'focus --window-id {target}'])
  aero('eval','; '.join(commands))
  return len(tiles)
 
-def enter(count=4,add=False):
+def enter(count=0,add=False):
  existing=aero('config','--config-path',check=False)
  if existing and existing!=str(ROOT/'config/aerospace.toml'):
   raise RuntimeError('Another AeroSpace configuration is active. Exit it before entering Control Center.')
@@ -95,10 +125,13 @@ def enter(count=4,add=False):
    aero('reload-config')
    aero('enable','on')
    aero('mode','active')
-  current=terminal_windows()
+  if not active and not existing: restore_pages()
+  migrate_pages()
+  workspace=page()
+  current=terminal_windows(workspace)
   if add: count=min(6,len(current)+1)
   before={w['window-id'] for w in current}
-  present={w['window-title'] for w in current}
+  present={w['window-title'] for w in terminal_windows()}
   needed=max(0,count-len(current))
   expected=set(present)
   for role in ROLES:
@@ -116,18 +149,24 @@ def enter(count=4,add=False):
   if add and active:
    # Insert only new windows; preserve current sizes, positions and fullscreen state.
    all_tiles=terminal_windows()
-   added=[w for w in all_tiles if w['window-id'] not in before]
+   added=[w for w in all_tiles if w['window-title'] in expected-present]
    for w in added:
     wid=str(w['window-id'])
-    aero('move-node-to-workspace','--window-id',wid,'Terminals')
+    aero('move-node-to-workspace','--window-id',wid,workspace)
     aero('layout','--window-id',wid,'tiling')
    if added:
-    aero('workspace','Terminals')
+    aero('workspace',workspace)
     aero('focus','--window-id',str(added[-1]['window-id']))
-   total=len(all_tiles)
+   total=len(terminal_windows(workspace))
+  elif count:
+   for w in terminal_windows():
+    if w['window-title'] in expected-present:
+     aero('move-node-to-workspace','--window-id',str(w['window-id']),workspace)
+   total=arrange(workspace)
   else:
-   total=arrange()
+   total=len(current)
   save_status('Active')
+  save_pages()
   return f'{total} plain terminal windows tiled. No agents launched.'
  except Exception:
   stop(True)
@@ -137,15 +176,15 @@ def main():
  action=sys.argv[1] if len(sys.argv)>1 else 'status'
  with (STATE/'controller.lock').open('w') as lock:
   fcntl.flock(lock,fcntl.LOCK_EX)
-  if action in ('enter','four','six','new'): print(enter(6 if action=='six' else 4,add=action=='new'))
+  if action in ('enter','four','six','new'): print(enter(6 if action=='six' else (4 if action=='four' else 0),add=action=='new'))
   elif action=='center':
    focused=json.loads(aero('list-windows','--focused','--json'))
-   if not focused or focused[0].get('app-name')!='Ghostty': raise RuntimeError('Focus a terminal first.')
+   if not focused: raise RuntimeError('Focus a window first.')
    wid=str(focused[0]['window-id'])
    layout=aero('list-windows','--focused','--format','%{window-layout}')
    if layout=='floating':
     aero('layout','--window-id',wid,'tiling')
-    aero('balance-sizes','--workspace','Terminals')
+    aero('balance-sizes','--workspace',page())
     aero('focus','--window-id',wid)
     print('Terminal returned to tiling.')
    else:

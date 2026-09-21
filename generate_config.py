@@ -8,9 +8,19 @@ start-at-login = false
 after-startup-command = []
 default-root-container-layout = 'tiles'
 default-root-container-orientation = 'horizontal'
-persistent-workspaces = ['Terminals']
+persistent-workspaces = ['1', '2', '3', '4', '5']
 [mode.main.binding]
 [mode.active.binding]
+cmd-1 = 'workspace 1'
+cmd-shift-1 = 'move-node-to-workspace 1'
+cmd-2 = 'workspace 2'
+cmd-shift-2 = 'move-node-to-workspace 2'
+cmd-3 = 'workspace 3'
+cmd-shift-3 = 'move-node-to-workspace 3'
+cmd-4 = 'workspace 4'
+cmd-shift-4 = 'move-node-to-workspace 4'
+cmd-5 = 'workspace 5'
+cmd-shift-5 = 'move-node-to-workspace 5'
 cmd-alt-c = 'exec-and-forget open -a "Claude"'
 cmd-alt-h = 'exec-and-forget open -a "Hermes"'
 cmd-alt-g = 'exec-and-forget open -a "ChatGPT Classic"'
@@ -33,8 +43,8 @@ cmd-t = 'layout floating tiling'
 cmd-alt-f = 'macos-native-fullscreen'
 alt-tab = 'focus --wrap-around dfs-next'
 alt-shift-tab = 'focus --wrap-around dfs-prev'
-cmd-b = 'balance-sizes --workspace Terminals'
-cmd-shift-equal = 'balance-sizes --workspace Terminals'
+cmd-b = 'balance-sizes'
+cmd-shift-equal = 'balance-sizes'
 cmd-enter = "exec-and-forget open -g 'agent-control-center://new'"
 ctrl-alt-4 = "exec-and-forget open -g 'agent-control-center://four'"
 ctrl-alt-6 = "exec-and-forget open -g 'agent-control-center://six'"
@@ -48,7 +58,10 @@ outer.right = 8
 outer.top = 8
 outer.bottom = 8
 [[on-window-detected]]
-if = 'true'
+if = 'test %{app-bundle-id} = com.richard.agentcontrolcenter'
+run = 'layout floating'
+[[on-window-detected]]
+if = 'test %{app-bundle-id} = com.apple.systempreferences'
 run = 'layout floating'
 '''
 (r/'config/aerospace.toml').write_text(config)
@@ -57,6 +70,6 @@ app='/Applications/Agent Control Center.app/Contents/MacOS/AgentControlCenter'
 for name,args,keep in [
  ('menu',[app,'--managed'],{'PathState':{str(s/'menu.enabled'):True}}),
  ('aerospace',['/Applications/AeroSpace.app/Contents/MacOS/AeroSpace','--config-path',str(r/'config/aerospace.toml')],{'PathState':{str(s/'aerospace.enabled'):True}}),
- *[('terminal.'+role.lower(),['/usr/bin/open','-W','-n','-a','/Applications/Ghostty.app','--args','--title=ACC · '+role,'--config-file='+str(r/'config/ghostty.conf'),'--working-directory='+str(Path.home()/'Documents')],False) for role in [str(i) for i in range(1,7)]]]:
+ *[('terminal.'+role.lower(),['/usr/bin/open','-W','-n','-a','/Applications/Ghostty.app','--args','--title=ACC · '+role,'--config-file='+str(r/'config/ghostty.conf'),'--working-directory='+str(Path.home()/'Documents')],False) for role in [str(i) for i in range(1,31)]]]:
  d={'Label':'com.richard.acc.'+name,'ProgramArguments':args,'RunAtLoad':False,'KeepAlive':keep,'ThrottleInterval':5,'EnvironmentVariables':env,'StandardOutPath':str(s/(name+'.log')),'StandardErrorPath':str(s/(name+'.error.log'))}
  (r/'launchd'/f'{name}.plist').write_bytes(plistlib.dumps(d))

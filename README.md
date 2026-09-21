@@ -17,3 +17,12 @@ Command-K opens the native shortcut panel. Command-O toggles a terminal between 
 
 ## Desktop shortcuts
 While Control Center is active: Command-Option-C opens Claude; H opens Hermes; G opens ChatGPT desktop (installed here as ChatGPT Classic); B opens Chrome; E opens Finder. Layout resets now send one batched request and preserve the focused terminal.
+
+## Five pages
+Command–1 through Command–5 selects that page. Command–Shift–1 through 5 moves the focused window there without following it. Pages start empty; current windows migrate once to page 1. New normal app windows tile on the current page. Existing app launch shortcuts may focus their existing window on another page. App minimum sizes cannot be overridden.
+
+Enter / Resume Five Pages does not create terminals. Command–Return creates one terminal (maximum six per page, thirty managed terminals total). Four / Six arrange only the current page. Command–O centers or returns any focused window to tiling.
+
+Page membership persists while switching and pausing. Orderly Exit saves membership for still-running windows on re-entry; exact tile trees are not restored after manager termination. Abrupt manager crashes and macOS restarts are not guaranteed to restore page assignments. No terminal sessions are closed by Exit. AeroSpace pages are virtual workspaces, separate from Mission Control Spaces.
+
+Rollback for this update: git revert the five-page commit, regenerate configuration with generate_config.py, then rebuild Launcher.swift and reload the configuration. To disable all management without stopping terminal sessions, run control.py rollback.

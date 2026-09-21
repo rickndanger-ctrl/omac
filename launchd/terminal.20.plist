@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>/Users/richardholguin/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+	</dict>
+	<key>KeepAlive</key>
+	<false/>
+	<key>Label</key>
+	<string>com.richard.acc.terminal.20</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/usr/bin/open</string>
+		<string>-W</string>
+		<string>-n</string>
+		<string>-a</string>
+		<string>/Applications/Ghostty.app</string>
+		<string>--args</string>
+		<string>--title=ACC · 20</string>
+		<string>--config-file=/Users/richardholguin/Documents/Codex/2026-09-20/is-x20/outputs/agent-control-center/config/ghostty.conf</string>
+		<string>--working-directory=/Users/richardholguin/Documents</string>
+	</array>
+	<key>RunAtLoad</key>
+	<false/>
+	<key>StandardErrorPath</key>
+	<string>/Users/richardholguin/Library/Application Support/AgentControlCenter/terminal.20.error.log</string>
+	<key>StandardOutPath</key>
+	<string>/Users/richardholguin/Library/Application Support/AgentControlCenter/terminal.20.log</string>
+	<key>ThrottleInterval</key>
+	<integer>5</integer>
+</dict>
+</plist>
