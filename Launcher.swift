@@ -115,11 +115,7 @@ class Delegate: NSObject,NSApplicationDelegate {
   if let value=sender.representedObject as? String,let url=URL(string:value) {NSWorkspace.shared.open(url)}
  }
  @objc func selected(_ sender:NSMenuItem) { perform(sender.representedObject as! String) }
- func perform(_ action:String) {
-  if action=="guide" {
-   // Capture the page before focusing the panel; open -g prevents premature activation.
-   let current=process("/opt/homebrew/bin/aerospace",["list-workspaces","--focused"])
-   let page=current.1.trimmingCharacters(in:.whitespacesAndNewlines)
+ func showGuide(page:String?) {
    guide?.close();guide=nil
    if guide==nil {
     let panel=GuidePanel(contentRect:NSRect(x:0,y:0,width:620,height:570),styleMask:[.titled,.closable,.fullSizeContentView],backing:.buffered,defer:false)
@@ -133,19 +129,23 @@ class Delegate: NSObject,NSApplicationDelegate {
     panel.contentView=web;guide=panel
    }
    guard let panel=guide else {return}
-   if current.0==0 {
-    _=process("/opt/homebrew/bin/aerospace",["move-node-to-workspace","--window-id",String(panel.windowNumber),page])
-   }
    panel.center();panel.makeKeyAndOrderFront(nil);NSApp.activate(ignoringOtherApps:true)
-   // Newly shown windows are detected asynchronously by AeroSpace.
-   DispatchQueue.main.asyncAfter(deadline:.now()+0.15) {
-    if current.0==0 {
-     let moved=process("/opt/homebrew/bin/aerospace",["move-node-to-workspace","--window-id",String(panel.windowNumber),page])
-     if moved.0 != 0 {NSLog("Guide move failed: %@",moved.1);return}
-     _=process("/opt/homebrew/bin/aerospace",["layout","--window-id",String(panel.windowNumber),"floating"])
-     _=process("/opt/homebrew/bin/aerospace",["focus","--window-id",String(panel.windowNumber)])
-    }
-    panel.makeKeyAndOrderFront(nil);NSApp.activate(ignoringOtherApps:true)
+   let windowID=String(panel.windowNumber)
+   DispatchQueue.global().asyncAfter(deadline:.now()+0.2) {
+    guard let page=page else {return}
+    let result=process("/opt/homebrew/bin/aerospace",["move-node-to-workspace","--window-id",windowID,page])
+    if result.0==0 {
+     _=process("/opt/homebrew/bin/aerospace",["layout","--window-id",windowID,"floating"])
+     _=process("/opt/homebrew/bin/aerospace",["focus","--window-id",windowID])
+    } else {NSLog("Guide move failed: %@",result.1)}
+   }
+ }
+ func perform(_ action:String) {
+  if action=="guide" {
+   DispatchQueue.global().async {
+    let current=process("/opt/homebrew/bin/aerospace",["list-workspaces","--focused"])
+    let page=current.1.trimmingCharacters(in:.whitespacesAndNewlines)
+    DispatchQueue.main.async {self.showGuide(page:current.0==0 ? page:nil)}
    }
    return
   }
