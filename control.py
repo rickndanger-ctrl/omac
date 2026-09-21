@@ -70,6 +70,7 @@ def arrange():
    aero('join-with','--window-id',wid,'left')
    aero('layout','--window-id',wid,'v_tiles')
   aero('balance-sizes')
+  aero('focus','--window-id',str(tiles[0]['window-id']))
  return len(tiles)
 
 def enter(count=4,add=False):

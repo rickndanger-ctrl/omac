@@ -11,10 +11,10 @@ default-root-container-orientation = 'horizontal'
 persistent-workspaces = ['Terminals']
 [mode.main.binding]
 [mode.active.binding]
-cmd-left = 'focus left'
-cmd-right = 'focus right'
-cmd-up = 'focus up'
-cmd-down = 'focus down'
+cmd-left = 'focus --ignore-floating left'
+cmd-right = 'focus --ignore-floating right'
+cmd-up = 'focus --ignore-floating up'
+cmd-down = 'focus --ignore-floating down'
 cmd-shift-left = 'swap left'
 cmd-shift-right = 'swap right'
 cmd-shift-up = 'swap up'
