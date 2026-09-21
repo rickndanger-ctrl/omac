@@ -94,7 +94,7 @@ final class OmacRendererView: NSView {
         let logoHeight = CGFloat(logo.count) * lineHeight
         let origin = CGPoint(x: (bounds.width - logoWidth) / 2, y: (bounds.height - logoHeight) / 2 - fontSize * 0.4)
 
-        // Four short terminal moods repeat: rain, scan, cursor, and glitch.
+        // Four eight-second scenes: matrix, spectrum, lightning, and particle assembly.
         // Each is deterministic so the saver stays calm and cheap to render.
         let effect = reduceMotion ? 0 : Int(phase / 8.0) % 4
         let effectProgress = reduceMotion ? 0.0 : phase.truncatingRemainder(dividingBy: 8.0) / 8.0
@@ -118,7 +118,9 @@ final class OmacRendererView: NSView {
                 .font: font,
                 .foregroundColor: NSColor(calibratedRed: 0.60, green: 0.85, blue: 0.40, alpha: effectProgress < 0.5 ? 0.8 : 0.15)
             ])
-            context.setLineWidth(max(1, fontSize * 0.10))
+            context.saveGState()
+            context.setShadow(offset: .zero, blur: 14, color: NSColor.cyan.withAlphaComponent(0.85).cgColor)
+            context.setLineWidth(max(1, fontSize * 0.055))
             context.setStrokeColor(NSColor(calibratedRed: 0.2, green: 0.85, blue: 1, alpha: 0.75).cgColor)
             for bolt in 0..<3 {
                 let path = CGMutablePath()
@@ -135,6 +137,7 @@ final class OmacRendererView: NSView {
             let sparkY = origin.y + logoHeight * (0.25 + 0.5 * CGFloat(sin(effectProgress * .pi)))
             context.setFillColor(NSColor(calibratedRed: 1, green: 0.55, blue: 0.08, alpha: 0.95).cgColor)
             context.fillEllipse(in: CGRect(x: sparkX - fontSize * 0.16, y: sparkY - fontSize * 0.16, width: fontSize * 0.32, height: fontSize * 0.32))
+            context.restoreGState()
         } else if effect == 3 {
             context.setFillColor(NSColor(calibratedRed: 0.95, green: 0.55, blue: 0.12, alpha: 0.55).cgColor)
             for particle in 0..<28 {
@@ -145,25 +148,29 @@ final class OmacRendererView: NSView {
             }
         }
 
-        let cycle = reduceMotion ? 1.0 : phase.truncatingRemainder(dividingBy: 12.0) / 12.0
+        let cycle = reduceMotion ? 0.5 : effectProgress
         for (index, line) in logo.enumerated() {
             let wobble = reduceMotion ? 0 : sin(phase + Double(index) * 0.7) * (effect == 3 ? 2.8 : 1.2)
             let baseHue = effect == 0 ? 0.27 : effect == 1 ? 0.76 : effect == 2 ? 0.56 : 0.10
             let reveal: Double
-            if reduceMotion || cycle >= 0.17 && cycle < 0.67 { reveal = 1 }
-            else if cycle < 0.17 { reveal = cycle / 0.17 }
-            else { reveal = max(0, 1 - (cycle - 0.67) / 0.33) }
+            if reduceMotion || cycle >= 0.12 && cycle < 0.88 { reveal = 1 }
+            else if cycle < 0.12 { reveal = cycle / 0.12 }
+            else { reveal = max(0, 1 - (cycle - 0.88) / 0.12) }
             let assembled = line.enumerated().map { column, character in
                 let cell = Double((index * 53 + column * 29) % 97) / 97.0
                 return cell <= reveal ? String(character) : " "
             }.joined()
             let cellWidth = "█".size(withAttributes: [.font: font]).width
             for (column, character) in assembled.enumerated() where character != " " {
-                let hue = (baseHue + Double(column) * 0.018 + phase * 0.025).truncatingRemainder(dividingBy: 1)
-                let color = NSColor(hue: CGFloat(hue), saturation: 0.78, brightness: 0.98, alpha: 0.96)
+                let hue = effect == 0 ? 0.27 : effect == 2 ? 0.54 + Double(column) * 0.001 : (baseHue + Double(column) * 0.018 + phase * 0.025).truncatingRemainder(dividingBy: 1)
+                let light = effect == 2 ? max(0, 1 - abs(Double(column) / 40 - effectProgress) * 12) : 0
+                let color = NSColor(hue: CGFloat(hue), saturation: CGFloat(0.78 * (1-light)), brightness: 0.98, alpha: 0.96)
                 let glyph = String(character) as NSString
                 let x = origin.x + CGFloat(column) * cellWidth + CGFloat(wobble)
-                glyph.draw(at: CGPoint(x: x, y: origin.y + CGFloat(index) * lineHeight), withAttributes: [.font: font, .foregroundColor: color])
+                let scatter = effect == 3 ? pow(abs(effectProgress - 0.5) * 2, 3) : 0
+                let dx = CGFloat(sin(Double(column * 13 + index * 7))) * bounds.width * 0.3 * scatter
+                let dy = CGFloat(cos(Double(column * 7 + index * 11))) * bounds.height * 0.3 * scatter
+                glyph.draw(at: CGPoint(x: x + dx, y: origin.y + CGFloat(index) * lineHeight + dy), withAttributes: [.font: font, .foregroundColor: color])
             }
             if effect == 3 && index % 3 == 0 {
                 let ghost = String(assembled.dropFirst(min(2, assembled.count)))
