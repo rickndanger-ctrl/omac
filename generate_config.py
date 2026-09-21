@@ -82,10 +82,8 @@ for i,line in enumerate(lines):
   lines[i]='after-startup-command = ['+json.dumps('exec-and-forget '+shlex.join([PYTHON,str(r/'control.py'),'recover']))+']'
  elif line.startswith('cmd-k ='):
   lines[i]='cmd-k = '+json.dumps('exec-and-forget '+shlex.join([app,'--guide']))
- elif line.startswith('cmd-esc = "exec-and-forget open -g 'agent-control-center://rescue'"
-cmd-alt-enter ='):
-  lines[i]='cmd-esc = "exec-and-forget open -g 'agent-control-center://rescue'"
-cmd-alt-enter = '+json.dumps("exec-and-forget open -g 'agent-control-center://menu'")
+ elif line.startswith('cmd-alt-enter ='):
+  lines[i]='cmd-alt-enter = '+json.dumps("exec-and-forget open -g 'agent-control-center://menu'")
 (RUNTIME/'config/aerospace.toml').write_text('\n'.join(lines)+'\n')
 env={'PATH':str(Path.home()/'.local/bin')+':/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin'}
 env.update({'PYTHONDONTWRITEBYTECODE':'1','OMAC_APP_EXECUTABLE':app,'OMAC_STATE_ROOT':str(s),'OMAC_AEROSPACE_CLI':AERO})
