@@ -39,3 +39,12 @@ Six-terminal reset completed in 0.167 seconds with the same window IDs. Seven te
 - Fixed a real restore defect: generic `tiling` could return accordion stacks; explicit `h_tiles` passed the repeated lifecycle test. Page 1 was reset to the six-terminal grid afterward.
 - No Ghostty processes were restarted or agents launched. Usage remained 41% at checkpoints.
 - Not fully verified: physical key interception, visual transition quality, every app's minimum sizing, sleep/wake, multiple displays, abrupt AeroSpace crash recovery. Page assignments after abrupt crashes are not guaranteed. Exact nested tile trees are not persisted across Exit.
+
+## Compact guide and everyday apps — 2026-09-21
+- Live Command–K binding tests passed on pages 2, 4, and 1 without changing the selected page. The fixed-size nonactivating panel is intentionally outside AeroSpace's tile tree.
+- Computer Use inspected the rendered 620×570 guide: neutral text, compact two-column layout, complete footer. Background opacity is configured at 0.85; text remains opaque.
+- Computer Use sent Escape successfully; subsequent window inspection found no accessible guide window (the inspection tool reports a timeout when the window is dismissed).
+- New Command–Option R/V/T/I/M/S bindings were triggered. AeroSpace's live app inventory confirmed Cursor, VS Code, Telegram, Messages, Mail, and System Settings running with the intended bundle IDs. Account setup and app-specific workflows were not changed.
+- Apps and Settings menus are implemented; individual submenu selection and every Settings deep link still need interactive acceptance testing.
+- Ten controller tests and the AeroSpace configuration dry-run pass.
+- Not a claim of exhaustive reliability: sleep/wake, all display arrangements, every app's minimum sizes, and abrupt manager crash recovery remain unverified.
