@@ -65,6 +65,12 @@ if CommandLine.arguments.contains("--restore") {
  }
  exit(0)
 }
+if CommandLine.arguments.contains("--guide") {
+ let current=process("/opt/homebrew/bin/aerospace",["list-workspaces","--focused"])
+ let page=current.1.trimmingCharacters(in:.whitespacesAndNewlines)
+ DistributedNotificationCenter.default().postNotificationName(NSNotification.Name("com.richard.acc.showGuide"),object:nil,userInfo:["page":current.0==0 ? page:""],deliverImmediately:true)
+ exit(0)
+}
 if !CommandLine.arguments.contains("--managed") {
  FileManager.default.createFile(atPath:state.appendingPathComponent("menu.enabled").path,contents:Data())
  let job="gui/\(getuid())/com.richard.acc.menu"
@@ -78,6 +84,7 @@ class Delegate: NSObject,NSApplicationDelegate {
  var item:NSStatusItem!; var busy=false; var guide:GuidePanel?
  func applicationDidFinishLaunching(_ note:Notification) {
   NSAppleEventManager.shared().setEventHandler(self,andSelector:#selector(urlEvent(_:reply:)),forEventClass:AEEventClass(kInternetEventClass),andEventID:AEEventID(kAEGetURL))
+  DistributedNotificationCenter.default().addObserver(self,selector:#selector(showGuideNotification(_:)),name:NSNotification.Name("com.richard.acc.showGuide"),object:nil)
   item=NSStatusBar.system.statusItem(withLength:NSStatusItem.variableLength); item.button?.title="▦ Control"
   let menu=NSMenu()
   for (title,action) in [("Enter / Resume Five Pages","enter"),("Open / Arrange 4 Terminals","four"),("Open / Arrange 6 Terminals","six"),("New Terminal (up to 6)","new"),("Pause Tiling and Shortcuts","pause"),("Exit and Restore Windows","exit"),("Shortcut Guide","guide"),("Accessibility Settings","access"),("Quit Launcher","quit")] {
@@ -115,6 +122,10 @@ class Delegate: NSObject,NSApplicationDelegate {
   if let value=sender.representedObject as? String,let url=URL(string:value) {NSWorkspace.shared.open(url)}
  }
  @objc func selected(_ sender:NSMenuItem) { perform(sender.representedObject as! String) }
+ @objc func showGuideNotification(_ notification:Notification) {
+  let value=notification.userInfo?["page"] as? String
+  showGuide(page: value?.isEmpty==false ? value:nil)
+ }
  func showGuide(page:String?) {
    guide?.close();guide=nil
    if guide==nil {
