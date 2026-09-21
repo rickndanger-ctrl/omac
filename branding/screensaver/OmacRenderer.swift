@@ -74,6 +74,21 @@ final class OmacRendererView: NSView {
         let t=reduceMotion ? 0.5 : phase.truncatingRemainder(dividingBy:8)/8
         let fade=reduceMotion ? 1 : min(1,min(t/0.1,(1-t)/0.1))
         if scene == 3,let image=emblem {
+            if !reduceMotion {
+                ctx.saveGState()
+                ctx.setShadow(offset:.zero,blur:14,color:NSColor.systemGreen.withAlphaComponent(0.5).cgColor)
+                for i in 0..<100 {
+                    let a=Double(i)*2.399963
+                    let life=(phase*0.35+Double(i)*0.031).truncatingRemainder(dividingBy:1)
+                    let radius=min(bounds.width,bounds.height)*(0.12+life*0.4)
+                    let x=bounds.midX+cos(a+phase*0.12)*radius
+                    let y=bounds.midY+sin(a+phase*0.12)*radius
+                    let color=i%3 == 0 ? NSColor.systemTeal : NSColor.systemGreen
+                    color.withAlphaComponent(fade*(1-life)*0.8).setFill()
+                    NSBezierPath(ovalIn:NSRect(x:x,y:y,width:2,height:2)).fill()
+                }
+                ctx.restoreGState()
+            }
             let side=min(bounds.width*0.34,bounds.height*0.60)
             image.draw(in:NSRect(x:bounds.midX-side/2,y:bounds.midY-side/2,width:side,height:side),from:.zero,operation:.sourceOver,fraction:fade,respectFlipped:true,hints:nil)
             return
@@ -92,7 +107,8 @@ final class OmacRendererView: NSView {
             let highlight=scene == 1 ? max(0,1-hypot(x-tip.x,y-tip.y)/18) : max(0,1-abs(x-beam)/max(1,width*0.045))
             if scene == 1 && i > etchIndex { continue }
             let brightness=scene == 2 ? 0.68+0.32*highlight : 0.78+0.22*highlight
-            let c=accent.blended(withFraction:highlight*0.85,of:.white) ?? accent
+            let palette=scene == 0 ? NSColor(calibratedRed:0.28+0.5*Double(cell.x/maskSize.width),green:0.78,blue:0.94,alpha:1) : accent
+            let c=palette.blended(withFraction:highlight*0.85,of:.white) ?? palette
             c.withAlphaComponent(fade*brightness).setFill()
             let drift=scene == 0 ? pow(abs(t-0.5)*2,5)*sin(Double(i)*1.7)*72 : 0
             // Tiny horizontal facets form crisp, finely detailed letter edges.
@@ -104,6 +120,8 @@ final class OmacRendererView: NSView {
         if scene == 2 {
             // Moving branched arcs skim the lettering; no full-screen flashes.
             for branch in 0..<9 {
+                let boltColor=branch%3 == 0 ? NSColor(calibratedRed:0.72,green:0.45,blue:1,alpha:1) : accent
+                ctx.setShadow(offset:.zero,blur:27,color:boltColor.withAlphaComponent(0.85*fade).cgColor)
                 let path=CGMutablePath()
                 let startX=origin.x+width*CGFloat(branch)/8
                 path.move(to:CGPoint(x:startX,y:origin.y-height*1.5))
@@ -114,7 +132,7 @@ final class OmacRendererView: NSView {
                     path.addLine(to:CGPoint(x:x,y:y))
                 }
                 ctx.addPath(path);ctx.setLineWidth(2.0)
-                ctx.setStrokeColor(accent.withAlphaComponent(fade*0.85).cgColor);ctx.strokePath()
+                ctx.setStrokeColor(boltColor.withAlphaComponent(fade*0.85).cgColor);ctx.strokePath()
                 ctx.addPath(path);ctx.setLineWidth(0.65)
                 ctx.setStrokeColor(NSColor.white.withAlphaComponent(fade*0.9).cgColor);ctx.strokePath()
                 // Smaller forks split off the main arc near the wordmark.
@@ -124,6 +142,19 @@ final class OmacRendererView: NSView {
                 fork.addLine(to:CGPoint(x:beam+CGFloat(branch-4)*27,y:origin.y+height*1.45))
                 ctx.addPath(fork);ctx.setLineWidth(0.8)
                 ctx.setStrokeColor(accent.withAlphaComponent(fade*0.55).cgColor);ctx.strokePath()
+            }
+        }
+        if scene == 0 {
+            for i in 0..<96 {
+                let age=(phase*0.65+Double(i)*0.618).truncatingRemainder(dividingBy:1)
+                let angle=Double(i)*2.399963
+                let radius=40+age*width*0.7
+                let x=bounds.midX+cos(angle)*radius,y=bounds.midY+sin(angle)*radius*0.55
+                let path=CGMutablePath();path.move(to:CGPoint(x:x,y:y))
+                path.addLine(to:CGPoint(x:x-cos(angle)*12,y:y-sin(angle)*8))
+                ctx.addPath(path);ctx.setLineWidth(1)
+                ctx.setStrokeColor((i%2 == 0 ? NSColor.systemTeal:NSColor.systemPurple).withAlphaComponent(fade*(1-age)*0.8).cgColor)
+                ctx.strokePath()
             }
         }
         if scene == 1 && etchProgress > 0 && etchProgress < 1 {
