@@ -373,7 +373,7 @@ class Delegate: NSObject,NSApplicationDelegate {
   let page=currentShelfPage();guard ["1","2","3","4","5"].contains(page) else{return}
   do {try shelf.summon(windowID:id,onWorkspace:page);shelfPage=page} catch {shelfError(error)}
  }
- @objc func shelfAction(_ note:Notification) {if let action=note.userInfo?["action"] as? String,["shelf","shelf-add","shelf-tuck","place-left","place-right"].contains(action) {perform(action)}}
+ @objc func shelfAction(_ note:Notification) {if let action=note.userInfo?["action"] as? String,["shelf","shelf-add","shelf-tuck","place-left","place-right","menu"].contains(action) {perform(action)}}
  @objc func shelfPageChanged(_ note:Notification) {
   guard shelfActive(),!shelfTransition,!shelf.entries.isEmpty else{return}
   let page=currentShelfPage()

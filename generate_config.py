@@ -61,7 +61,7 @@ cmd-b = 'balance-sizes'
 cmd-shift-equal = 'balance-sizes'
 cmd-esc = "exec-and-forget open -g 'agent-control-center://rescue'"
 cmd-shift-esc = "exec-and-forget open -g 'agent-control-center://refocus'"
-cmd-alt-enter = "exec-and-forget open -g 'agent-control-center://menu'"
+cmd-alt-enter = 'exec-and-forget "/Applications/Omac.app/Contents/MacOS/AgentControlCenter" --shelf-action menu'
 cmd-enter = "exec-and-forget open -g 'agent-control-center://new'"
 ctrl-alt-4 = "exec-and-forget open -g 'agent-control-center://four'"
 ctrl-alt-6 = "exec-and-forget open -g 'agent-control-center://six'"
@@ -98,7 +98,7 @@ for i,line in enumerate(lines):
  elif line.startswith('cmd-k ='):
   lines[i]='cmd-k = '+json.dumps('exec-and-forget '+shlex.join([app,'--guide']))
  elif line.startswith('cmd-alt-enter ='):
-  lines[i]='cmd-alt-enter = '+json.dumps("exec-and-forget open -g 'agent-control-center://menu'")
+  lines[i]='cmd-alt-enter = '+json.dumps('exec-and-forget "/Applications/Omac.app/Contents/MacOS/AgentControlCenter" --shelf-action menu')
 (RUNTIME/'config/aerospace.toml').write_text('\n'.join(lines)+'\n')
 env={'PATH':str(Path.home()/'.local/bin')+':/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin'}
 env.update({'PYTHONDONTWRITEBYTECODE':'1','OMAC_APP_EXECUTABLE':app,'OMAC_STATE_ROOT':str(s),'OMAC_AEROSPACE_CLI':AERO})
