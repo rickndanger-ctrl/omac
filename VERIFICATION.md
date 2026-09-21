@@ -67,3 +67,14 @@ Six-terminal reset completed in 0.167 seconds with the same window IDs. Seven te
 - Actual reboot, sleep/wake and alternate physical display configurations remain untested.
 - Disengage and re-engage live run preserved all 24 window ID/PID pairs (zero lost) and returned Active. This includes the temporary Settings sheet; no agents were stopped.
 - Revised native preview visually checked with multicolor wordmark and cyan lightning scene; key 3 selects lightning successfully. Four eight-second scenes cycle. Installed updated signed saver after committing sources. Preview left open for user review; native idle activation remains unverified.
+
+## Native packaging preview — isolated branch
+
+The daily-use installation has not been replaced. Preview build uses bundled resources and per-user generated configs; native SMAppService login code is compiled but NOT registered/tested on this machine.
+
+- 15 tests passed, including a relocated resource path containing spaces/apostrophes and checks that generated jobs do not point to the original source checkout.
+- A signed app was copied to a separate temporary location; `--check` passed, reported its relocated resources, and created no state directory.
+- Config generation ran from the relocated app into a separate test state directory. Deep strict signature verification still passed afterward.
+- Built Apple Silicon macOS 14+ DMG; disk-image checksum verification passed (about 10 MB). No original developer checkout path found inside the staged app.
+- This is Apple Development signed, not Developer ID signed or notarized. It is not public-release ready.
+- No native login registration, live upgrade/migration, clean-account boot, or fresh-Mac test has been claimed. No dependency or user permission was installed by packaging.

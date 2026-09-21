@@ -1,0 +1,37 @@
+#!/bin/zsh
+# Build-only. Does not install, restart services, register login, or notarize.
+set -euo pipefail
+cd "${0:A:h}"
+python_cmd="${OMAC_BUILD_PYTHON:-$(command -v python3)}"
+identity="${OMAC_SIGN_IDENTITY:--}"
+version=1.2.0-preview
+arch="$(uname -m)"
+out="$PWD/dist"
+stage="$out/staging"
+app="$stage/Omac.app"
+[[ ! -e "$app" ]] || { print -u2 'Existing staging app: move dist aside before rebuilding.'; exit 1; }
+mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources/Payload/config" "$app/Contents/Resources/Payload/branding/wallpapers" "$app/Contents/Resources/Extras"
+swiftc -O -target "$arch-apple-macosx14.0" Launcher.swift -o "$app/Contents/MacOS/AgentControlCenter" -framework Cocoa -framework ApplicationServices -framework WebKit -framework ServiceManagement
+cp Info.plist "$app/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $version" "$app/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c 'Add :CFBundleVersion string 120' "$app/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c 'Add :LSMinimumSystemVersion string 14.0' "$app/Contents/Info.plist"
+cp branding/Omac.icns "$app/Contents/Resources/"
+cp control.py watcher.py portable_paths.py generate_config.py Guide.html "$app/Contents/Resources/Payload/"
+cp config/ghostty.conf "$app/Contents/Resources/Payload/config/"
+cp branding/wallpapers/omac-{obsidian,amber,pine,emerald-glass,storm-forge,crimson-etch}.png "$app/Contents/Resources/Payload/branding/wallpapers/"
+branding/screensaver/build.sh
+cp -R branding/screensaver/build/OMAC.saver branding/screensaver/build/OMAC-Preview.app "$app/Contents/Resources/Extras/"
+for bundle in "$app/Contents/Resources/Extras/OMAC.saver" "$app/Contents/Resources/Extras/OMAC-Preview.app" "$app"; do
+ codesign --force --options runtime --sign "$identity" "$bundle"
+ codesign --verify --deep --strict "$bundle"
+done
+cp DISTRIBUTION.md "$stage/START HERE.md"
+cp "Install Omac.command" "$stage/Install Omac.command"
+chmod +x "$stage/Install Omac.command"
+ln -s /Applications "$stage/Applications"
+"$python_cmd" -m unittest discover -p 'test_*.py'
+hdiutil create -volname "Omac Preview" -srcfolder "$stage" -format UDZO "$out/Omac-$version-$arch.dmg"
+hdiutil verify "$out/Omac-$version-$arch.dmg"
+(cd "$out" && shasum -a 256 "Omac-$version-$arch.dmg" > "Omac-$version-$arch.dmg.sha256")
+print "Built $out/Omac-$version-$arch.dmg — development preview, not a notarized public release."

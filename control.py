@@ -3,12 +3,9 @@
 import fcntl,json,os,plistlib,subprocess,sys,time
 from functools import lru_cache
 from pathlib import Path
-ROOT=Path(__file__).resolve().parent
-STATE=Path.home()/'Library/Application Support/AgentControlCenter'
+from portable_paths import SOURCE as ROOT, STATE, RUNTIME, AERO, APP
 STATE.mkdir(parents=True,exist_ok=True)
 DOMAIN=f'gui/{os.getuid()}'
-AERO='/opt/homebrew/bin/aerospace'
-APP='/Applications/Omac.app/Contents/MacOS/AgentControlCenter'
 ROLES=[str(i) for i in range(1,31)]
 
 def run(*args,check=True):
@@ -24,7 +21,7 @@ def load(name):
   # Reload only when creating a missing terminal; preserve already-open Ghostty windows.
   run('launchctl','bootout',job(name),check=False)
   p.returncode=1
- if p.returncode: run('launchctl','bootstrap',DOMAIN,ROOT/'launchd'/f'{name}.plist')
+ if p.returncode: run('launchctl','bootstrap',DOMAIN,RUNTIME/'launchd'/f'{name}.plist')
 
 def windows():
  return json.loads(aero('list-windows','--all','--format','%{window-id} %{app-pid} %{app-name} %{window-title} %{workspace} %{window-layout}','--json'))
@@ -134,9 +131,9 @@ def start_services():
 
 def enter(count=0,add=False):
  existing=aero('config','--config-path',check=False)
- if existing and existing!=str(ROOT/'config/aerospace.toml'):
+ if existing and existing!=str(RUNTIME/'config/aerospace.toml'):
   raise RuntimeError('Another AeroSpace configuration is active. Exit it before entering Omac.')
- active=existing==str(ROOT/'config/aerospace.toml') and (STATE/'status').exists() and (STATE/'status').read_text()=='Active'
+ active=existing==str(RUNTIME/'config/aerospace.toml') and (STATE/'status').exists() and (STATE/'status').read_text()=='Active'
  if not active:
   run(APP,'--snapshot')
   (STATE/'aerospace.enabled').touch()
@@ -144,7 +141,7 @@ def enter(count=0,add=False):
   run('launchctl','kickstart',job('aerospace'))
  try:
   if not active: ready()
-  if aero('config','--config-path')!=str(ROOT/'config/aerospace.toml'):
+  if aero('config','--config-path')!=str(RUNTIME/'config/aerospace.toml'):
    raise RuntimeError('A different AeroSpace instance is running.')
   if not active:
    aero('reload-config')
@@ -204,7 +201,7 @@ def login():
  if marker.exists() and marker.read_text()!=boot_session():
   (STATE/'windows.json').unlink(missing_ok=True)
  marker.write_text(boot_session())
- if aero('config','--config-path',check=False)!=str(ROOT/'config/aerospace.toml'):
+ if aero('config','--config-path',check=False)!=str(RUNTIME/'config/aerospace.toml'):
   save_status('Inactive')
  (STATE/'menu.enabled').touch()
  load('menu');run('launchctl','kickstart',job('menu'))
@@ -213,7 +210,7 @@ def login_enabled(enabled):
  destination=Path.home()/'Library/LaunchAgents/com.richard.acc.login.plist'
  if enabled:
   destination.parent.mkdir(parents=True,exist_ok=True)
-  destination.write_bytes((ROOT/'launchd/login.plist').read_bytes())
+  destination.write_bytes((RUNTIME/'launchd/login.plist').read_bytes())
   run('launchctl','bootout',job('login'),check=False)
   run('launchctl','bootstrap',DOMAIN,destination)
   return 'Omac will start after macOS sign-in.'

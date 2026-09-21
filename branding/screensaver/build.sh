@@ -6,6 +6,10 @@ SDK="$(xcrun --sdk macosx --show-sdk-path)"
 MIN_OS="14.0"
 ARCH="$(uname -m)"
 mkdir -p "$BUILD_DIR/OMAC.saver/Contents/MacOS" "$BUILD_DIR/OMAC.saver/Contents/Resources" "$BUILD_DIR/OMAC-Preview.app/Contents/MacOS" "$BUILD_DIR/OMAC-Preview.app/Contents/Resources"
+for wallpaper in emerald-glass storm-forge crimson-etch; do
+  cp "$SCRIPT_DIR/../../../omac-visual-concepts/$wallpaper.png" "$BUILD_DIR/OMAC.saver/Contents/Resources/$wallpaper.png"
+  cp "$SCRIPT_DIR/../../../omac-visual-concepts/$wallpaper.png" "$BUILD_DIR/OMAC-Preview.app/Contents/Resources/$wallpaper.png"
+done
 
 swiftc -sdk "$SDK" -target "$ARCH-apple-macosx$MIN_OS" -framework AppKit -framework ScreenSaver \
   "$SCRIPT_DIR/OmacRenderer.swift" "$SCRIPT_DIR/OmacScreenSaver.swift" \

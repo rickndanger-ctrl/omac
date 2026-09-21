@@ -13,6 +13,10 @@ final class OmacRendererView: NSView {
         guard let url = bundle.url(forResource: "Omac", withExtension: "png") else { return nil }
         return NSImage(contentsOf: url)
     }()
+    private lazy var wallpapers: [NSImage] = ["emerald-glass", "storm-forge", "crimson-etch"].compactMap {
+        guard let url = Bundle(for: OmacRendererView.self).url(forResource: $0, withExtension: "png") else { return nil }
+        return NSImage(contentsOf: url)
+    }
     override var isFlipped: Bool { true }
 
     init(frame: NSRect, reduceMotion: Bool? = nil, initialPhase: Double = 0) {
@@ -70,8 +74,13 @@ final class OmacRendererView: NSView {
     override func draw(_ rect: NSRect) {
         guard let ctx=NSGraphicsContext.current?.cgContext else {return}
         NSColor(calibratedRed:0.008,green:0.014,blue:0.019,alpha:1).setFill(); bounds.fill()
-        let scene=reduceMotion ? 2 : Int(phase/8)%4
+        let scene=reduceMotion ? 0 : Int(phase/8)%4
         let t=reduceMotion ? 0.5 : phase.truncatingRemainder(dividingBy:8)/8
+        if wallpapers.count == 3 {
+            drawWallpaper(in: bounds, scene: reduceMotion ? 0 : Int(phase/8)%3, progress: t)
+            if !reduceMotion { drawAmbientParticles(in: bounds, progress: t); drawSceneEnergy(scene:Int(phase/8)%3,progress:t) }
+            return
+        }
         let fade=reduceMotion ? 1 : min(1,min(t/0.1,(1-t)/0.1))
         if scene == 3,let image=emblem {
             if !reduceMotion {
@@ -200,5 +209,79 @@ final class OmacRendererView: NSView {
             NSRect(x:beam,y:sparkY,width:4,height:4).fill()
         }
         ctx.restoreGState()
+    }
+
+    private func drawWallpaper(in bounds: NSRect, scene: Int, progress: Double) {
+        guard wallpapers.count == 3 else { return }
+        let first = scene % 3
+        let second = (first + 1) % 3
+        let blend = reduceMotion ? CGFloat(0) : CGFloat(max(0,min(1,(progress-0.78)/0.22)))
+        for (image, alpha) in [(wallpapers[first], CGFloat(1)), (wallpapers[second], blend)] where alpha > 0.01 {
+            let source = NSRect(origin: .zero, size: image.size)
+            let scale = max(bounds.width / source.width, bounds.height / source.height) * 1.015
+            let size = NSSize(width: source.width * scale, height: source.height * scale)
+            let drift = reduceMotion ? CGFloat(0) : CGFloat(sin(phase * 0.15) * 5)
+            let destination = NSRect(x: bounds.midX - size.width / 2 + drift, y: bounds.midY - size.height / 2, width: size.width, height: size.height)
+            image.draw(in: destination, from: source, operation: .sourceOver, fraction: alpha, respectFlipped: true, hints: [.interpolation: NSImageInterpolation.high])
+        }
+    }
+
+    private func drawSceneEnergy(scene:Int,progress:Double) {
+        guard let ctx=NSGraphicsContext.current?.cgContext else {return}
+        ctx.saveGState();defer {ctx.restoreGState()}
+        let fade=CGFloat(min(1,min(progress/0.08,(1-progress)/0.22)))
+        let w=bounds.width,h=bounds.height
+        if scene == 0 {
+            // A soft traveling emerald highlight, with no flash or opaque veil.
+            let x=w*(0.39+0.22*(sin(phase*0.65)+1)/2)
+            ctx.setShadow(offset:.zero,blur:24,color:NSColor.green.withAlphaComponent(0.35*fade).cgColor)
+            NSColor.green.withAlphaComponent(0.12*fade).setStroke()
+            let p=NSBezierPath();p.move(to:NSPoint(x:x,y:h*0.39));p.line(to:NSPoint(x:x-8,y:h*0.58));p.lineWidth=1;p.stroke()
+        } else if scene == 1 {
+            // Branching arcs evolve continuously; their glow breathes rather than strobing.
+            let pulse=CGFloat(0.35+0.25*sin(phase*2)) * fade
+            for branch in 0..<5 {
+                let color=branch%2==0 ? NSColor.cyan:NSColor.systemPurple
+                ctx.setShadow(offset:.zero,blur:12,color:color.withAlphaComponent(pulse).cgColor)
+                color.withAlphaComponent(pulse).setStroke()
+                let p=NSBezierPath()
+                for step in 0...18 {
+                    let t=Double(step)/18,side=branch%2==0 ? -1.0:1.0
+                    let x=w*(0.5+side*t*0.28)+sin(Double(step)*2.7+phase*3+Double(branch))*8*t
+                    let y=h*(0.36+Double(branch)*0.065-t*0.22)+cos(Double(step)*1.9+phase*2)*9*t
+                    if step==0 {p.move(to:NSPoint(x:x,y:y))} else {p.line(to:NSPoint(x:x,y:y))}
+                }
+                p.lineWidth=1;p.stroke()
+            }
+        } else {
+            let tip=NSPoint(x:w*(0.36+0.28*(sin(phase*0.6)+1)/2),y:h*0.69)
+            ctx.setShadow(offset:.zero,blur:13,color:NSColor.red.cgColor)
+            NSColor.red.withAlphaComponent(0.7*fade).setStroke()
+            let beam=NSBezierPath();beam.move(to:NSPoint(x:w*0.84,y:0));beam.line(to:tip);beam.lineWidth=1.3;beam.stroke()
+            for i in 0..<70 {
+                let age=(phase*1.2+Double(i)*0.071).truncatingRemainder(dividingBy:1)
+                let angle=Double(i)*2.39996,speed=40+Double(i%13)*9
+                let x=tip.x+cos(angle)*speed*age,y=tip.y+sin(angle)*speed*age+70*age*age
+                NSColor(calibratedRed:1,green:0.25+Double(i%4)*0.13,blue:0.05,alpha:(1-age)*Double(fade)).setStroke()
+                let p=NSBezierPath();p.move(to:NSPoint(x:x,y:y));p.line(to:NSPoint(x:x-cos(angle)*7,y:y-sin(angle)*7));p.lineWidth=1;p.stroke()
+            }
+        }
+    }
+
+    private func drawAmbientParticles(in bounds: NSRect, progress: Double) {
+        let context = NSGraphicsContext.current?.cgContext
+        context?.saveGState()
+        context?.setShadow(offset: .zero, blur: 7, color: NSColor.systemTeal.withAlphaComponent(0.25).cgColor)
+        for index in 0..<42 {
+            let seed = Double(index) * 2.399963
+            let life = (phase * 0.12 + Double(index) * 0.071).truncatingRemainder(dividingBy: 1)
+            let radius = min(bounds.width, bounds.height) * (0.18 + life * 0.38)
+            let point = CGPoint(x: bounds.midX + cos(seed + phase * 0.08) * radius,
+                               y: bounds.midY + sin(seed + phase * 0.08) * radius * 0.58)
+            let color = index % 3 == 0 ? NSColor.systemPurple : NSColor.systemTeal
+            color.withAlphaComponent((1 - life) * 0.26).setFill()
+            NSBezierPath(ovalIn: NSRect(x: point.x, y: point.y, width: 1.5, height: 1.5)).fill()
+        }
+        context?.restoreGState()
     }
 }

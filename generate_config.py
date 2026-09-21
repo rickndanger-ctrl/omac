@@ -1,7 +1,8 @@
 from pathlib import Path
-import plistlib,shlex
-r=Path(__file__).resolve().parent
-s=Path.home()/'Library/Application Support/AgentControlCenter'
+import plistlib,shlex,os,sys,json
+from portable_paths import SOURCE as r, STATE as s, RUNTIME, APP as app, PYTHON, AERO, AERO_APP, GHOSTTY_APP
+(RUNTIME/'config').mkdir(parents=True,exist_ok=True)
+(RUNTIME/'launchd').mkdir(parents=True,exist_ok=True)
 s.mkdir(parents=True,exist_ok=True)
 config='''config-version = 2
 start-at-login = false
@@ -31,7 +32,7 @@ cmd-alt-v = 'exec-and-forget open -b com.microsoft.VSCode'
 cmd-alt-t = 'exec-and-forget open -b ru.keepcoder.Telegram'
 cmd-alt-i = 'exec-and-forget open -b com.apple.MobileSMS'
 cmd-alt-m = 'exec-and-forget open -b com.apple.mail'
-cmd-alt-s = 'exec-and-forget open -b com.apple.systempreferences'
+ cmd-alt-s = 'exec-and-forget open -b com.apple.systempreferences'
 cmd-left = 'focus --ignore-floating left'
 cmd-right = 'focus --ignore-floating right'
 cmd-up = 'focus --ignore-floating up'
@@ -73,14 +74,22 @@ run = 'layout floating'
 if = 'test %{app-bundle-id} = com.richardholguin.omac.preview'
 run = 'layout floating'
 '''
-(r/'config/aerospace.toml').write_text(config.replace('CONTROLLER',str(r/'control.py')))
+lines=config.splitlines()
+for i,line in enumerate(lines):
+ if line.startswith('after-startup-command ='):
+  lines[i]='after-startup-command = ['+json.dumps('exec-and-forget '+shlex.join([PYTHON,str(r/'control.py'),'recover']))+']'
+ elif line.startswith('cmd-k ='):
+  lines[i]='cmd-k = '+json.dumps('exec-and-forget '+shlex.join([app,'--guide']))
+ elif line.startswith('cmd-alt-enter ='):
+  lines[i]='cmd-alt-enter = '+json.dumps("exec-and-forget open -g 'agent-control-center://menu'")
+(RUNTIME/'config/aerospace.toml').write_text('\n'.join(lines)+'\n')
 env={'PATH':str(Path.home()/'.local/bin')+':/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin'}
-app='/Applications/Omac.app/Contents/MacOS/AgentControlCenter'
+env.update({'PYTHONDONTWRITEBYTECODE':'1','OMAC_APP_EXECUTABLE':app,'OMAC_STATE_ROOT':str(s),'OMAC_AEROSPACE_CLI':AERO})
 for name,args,keep in [
- ('watcher',['/opt/homebrew/bin/python3',str(r/'watcher.py')],{'PathState':{str(s/'aerospace.enabled'):True}}),
+ ('watcher',[PYTHON,str(r/'watcher.py')],{'PathState':{str(s/'aerospace.enabled'):True}}),
  ('login',[app,'--login'],False),
  ('menu',[app,'--managed'],{'PathState':{str(s/'menu.enabled'):True}}),
- ('aerospace',['/Applications/AeroSpace.app/Contents/MacOS/AeroSpace','--config-path',str(r/'config/aerospace.toml')],{'PathState':{str(s/'aerospace.enabled'):True}}),
- *[('terminal.'+role.lower(),['/usr/bin/open','-W','-n','-a','/Applications/Ghostty.app','--args','--title=Omac · '+role,'--config-file='+str(r/'config/ghostty.conf'),'--working-directory='+str(Path.home()/'Documents')],False) for role in [str(i) for i in range(1,31)]]]:
+ ('aerospace',[str(Path(AERO_APP)/'Contents/MacOS/AeroSpace'),'--config-path',str(RUNTIME/'config/aerospace.toml')],{'PathState':{str(s/'aerospace.enabled'):True}}),
+ *[('terminal.'+role.lower(),['/usr/bin/open','-W','-n','-a',GHOSTTY_APP,'--args','--title=Omac · '+role,'--config-file='+str(r/'config/ghostty.conf'),'--working-directory='+str(Path.home()/'Documents')],False) for role in [str(i) for i in range(1,31)]]]:
  d={'Label':'com.richard.acc.'+name,'ProgramArguments':args,'RunAtLoad':name=='login','KeepAlive':keep,'ThrottleInterval':5,'EnvironmentVariables':env,'StandardOutPath':str(s/(name+'.log')),'StandardErrorPath':str(s/(name+'.error.log'))}
- (r/'launchd'/f'{name}.plist').write_bytes(plistlib.dumps(d))
+ (RUNTIME/'launchd'/f'{name}.plist').write_bytes(plistlib.dumps(d))

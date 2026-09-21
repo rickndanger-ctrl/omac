@@ -46,6 +46,7 @@ alt-tab = 'focus --wrap-around dfs-next'
 alt-shift-tab = 'focus --wrap-around dfs-prev'
 cmd-b = 'balance-sizes'
 cmd-shift-equal = 'balance-sizes'
+cmd-alt-enter = "exec-and-forget open -g 'agent-control-center://menu'"
 cmd-enter = "exec-and-forget open -g 'agent-control-center://new'"
 ctrl-alt-4 = "exec-and-forget open -g 'agent-control-center://four'"
 ctrl-alt-6 = "exec-and-forget open -g 'agent-control-center://six'"
