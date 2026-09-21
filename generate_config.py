@@ -94,7 +94,7 @@ for i,line in enumerate(lines):
   app_bundles={'c':'com.anthropic.claudefordesktop','h':'com.nousresearch.hermes.setup','g':'com.openai.codex','b':'com.google.Chrome','e':'com.apple.finder','r':'com.todesktop.230313mzl4w4u92','v':'com.microsoft.VSCode','t':'ru.keepcoder.Telegram','i':'com.apple.MobileSMS','m':'com.apple.mail','s':'com.apple.systempreferences'}
   key=line.split(' =')[0].strip()
   bundle=app_bundles.get(key.removeprefix('cmd-alt-'))
-  if bundle: lines[i]=key+' = '+json.dumps("exec-and-forget open -g 'agent-control-center://launch?bundle="+bundle+"'")
+  if bundle: lines[i]=key+' = '+json.dumps("exec-and-forget "+shlex.join([app,"--favorite-key",key.removeprefix("cmd-alt-")]))
  elif line.startswith('cmd-k ='):
   lines[i]='cmd-k = '+json.dumps('exec-and-forget '+shlex.join([app,'--guide']))
  elif line.startswith('cmd-alt-enter ='):

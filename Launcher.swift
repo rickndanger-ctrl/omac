@@ -244,6 +244,10 @@ if CommandLine.arguments.contains("--apply-wallpaper") || CommandLine.arguments.
  if restoring && !failed {try? FileManager.default.removeItem(at:wallpaperBackup)}
  exit(failed ? 1:0)
 }
+if let index=CommandLine.arguments.firstIndex(of:"--favorite-key"),CommandLine.arguments.count>index+1 {
+ DistributedNotificationCenter.default().postNotificationName(NSNotification.Name("com.richard.omac.shelfAction"),object:nil,userInfo:["action":"favorite","key":CommandLine.arguments[index+1]],deliverImmediately:true)
+ RunLoop.current.run(until:Date(timeIntervalSinceNow:0.1));exit(0)
+}
 if let index=CommandLine.arguments.firstIndex(of:"--shelf-action"),CommandLine.arguments.count>index+1 {
  DistributedNotificationCenter.default().postNotificationName(NSNotification.Name("com.richard.omac.shelfAction"),object:nil,userInfo:["action":CommandLine.arguments[index+1]],deliverImmediately:true)
  RunLoop.current.run(until:Date(timeIntervalSinceNow:0.1));exit(0)
@@ -345,6 +349,8 @@ class Delegate: NSObject,NSApplicationDelegate {
  var item:NSStatusItem!; var busy=false; var guide:GuidePanel?
  let shelf=AppShelf(checkpointURL:state.appendingPathComponent("app-shelf.json")); let shelfPanel=ShelfPanel()
  var shelfItems:[NSStatusItem]=[]
+ let favorites=AppFavorites(url:state.appendingPathComponent("app-favorites.json"))
+ let favoriteMenu=NSMenu(title:"App Shortcuts")
  let menuPanel=OmacMenuPanel()
  var menuModel:NSMenu?
  var shelfIDs:[CGWindowID]=[]
@@ -376,7 +382,7 @@ class Delegate: NSObject,NSApplicationDelegate {
   let page=currentShelfPage();guard ["1","2","3","4","5"].contains(page) else{return}
   do {try shelf.summon(windowID:id,onWorkspace:page);shelfPage=page} catch {shelfError(error)}
  }
- @objc func shelfAction(_ note:Notification) {if let action=note.userInfo?["action"] as? String,["shelf","shelf-add","shelf-tuck","place-left","place-right","menu"].contains(action) {perform(action)}}
+ @objc func shelfAction(_ note:Notification) {if note.userInfo?["action"] as? String == "favorite",let key=note.userInfo?["key"] as? String,let bundle=favorites.bundle(for:key),shelfActive() {launchShelfApp(bundle);return};if let action=note.userInfo?["action"] as? String,["shelf","shelf-add","shelf-tuck","place-left","place-right","menu"].contains(action) {perform(action)}}
  @objc func shelfPageChanged(_ note:Notification) {
   guard shelfActive(),!shelfTransition else{return}
   let page=currentShelfPage()
@@ -444,6 +450,8 @@ class Delegate: NSObject,NSApplicationDelegate {
    let m=NSMenuItem(title:title,action:#selector(selected(_:)),keyEquivalent:""); m.representedObject=action; m.target=self; menu.addItem(m)
   }
   menu.addItem(.separator())
+  refreshFavoriteMenu()
+  let favoriteItem=NSMenuItem(title:"Customize App Shortcuts",action:nil,keyEquivalent:"");favoriteItem.submenu=favoriteMenu;menu.addItem(favoriteItem)
   let appsHeading=NSMenuItem(title:"Applications",action:nil,keyEquivalent:"")
   appsHeading.isEnabled=false;menu.addItem(appsHeading)
   for app in omacInstalledApplications() {
@@ -486,6 +494,26 @@ class Delegate: NSObject,NSApplicationDelegate {
   if menuPanel.isVisible {menuPanel.dismiss();return}
   guide?.orderOut(nil);shelfPanel.orderOut(nil)
   if let menu=menuModel {menuPanel.present(menu:menu,anchor:item.button?.window?.frame)}
+ }
+ func refreshFavoriteMenu() {
+  favoriteMenu.removeAllItems()
+  let apps=omacInstalledApplications()
+  for key in AppFavorites.defaults.keys.sorted() {
+   let slot=NSMenuItem(title:"⌘⌥ \(key.uppercased()) — \(favorites.name(for:key))",action:nil,keyEquivalent:"")
+   let choices=NSMenu()
+   for app in apps {
+    let choice=NSMenuItem(title:app.name,action:#selector(assignFavorite(_:)),keyEquivalent:"")
+    choice.target=self;choice.representedObject=["key":key,"bundle":app.bundleID]
+    choice.state=favorites.bundle(for:key)==app.bundleID ? .on:.off
+    let icon=NSWorkspace.shared.icon(forFile:app.url.path);icon.size=NSSize(width:18,height:18);choice.image=icon
+    choices.addItem(choice)
+   }
+   slot.submenu=choices;favoriteMenu.addItem(slot)
+  }
+ }
+ @objc func assignFavorite(_ sender:NSMenuItem) {
+  guard let value=sender.representedObject as? [String:String],let key=value["key"],let bundle=value["bundle"] else{return}
+  do {try favorites.assign(key:key,bundleID:bundle);refreshFavoriteMenu()} catch {shelfError(error)}
  }
  @objc func launchApp(_ sender:NSMenuItem) {
   if let bundle=sender.representedObject as? String {launchShelfApp(bundle)}
@@ -558,7 +586,7 @@ class Delegate: NSObject,NSApplicationDelegate {
     panel.appearance=NSAppearance(named:.darkAqua)
     let web=WKWebView(frame:panel.contentView!.bounds);web.autoresizingMask=[.width,.height]
     web.setValue(false,forKey:"drawsBackground")
-    web.loadFileURL(URL(fileURLWithPath:root+"/Guide.html"),allowingReadAccessTo:URL(fileURLWithPath:root))
+    if let html=try? String(contentsOfFile:root+"/Guide.html",encoding:.utf8) {web.loadHTMLString(favorites.renderGuide(html),baseURL:URL(fileURLWithPath:root))}
     panel.contentView=web;guide=panel
    }
    guard let panel=guide else {return}
