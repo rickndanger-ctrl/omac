@@ -1,0 +1,33 @@
+config-version = 2
+start-at-login = false
+after-startup-command = ['enable off']
+default-root-container-layout = 'tiles'
+default-root-container-orientation = 'horizontal'
+persistent-workspaces = ['Agents', 'Research']
+[mode.main.binding]
+[mode.active.binding]
+ctrl-alt-left = 'focus left'
+ctrl-alt-right = 'focus right'
+ctrl-alt-up = 'focus up'
+ctrl-alt-down = 'focus down'
+ctrl-alt-shift-left = 'move left'
+ctrl-alt-shift-right = 'move right'
+ctrl-alt-shift-up = 'move up'
+ctrl-alt-shift-down = 'move down'
+ctrl-alt-1 = 'workspace Agents'
+ctrl-alt-2 = 'workspace Research'
+ctrl-alt-minus = 'resize smart -50'
+ctrl-alt-equal = 'resize smart +50'
+ctrl-alt-f = 'fullscreen'
+ctrl-alt-space = 'layout floating tiling'
+ctrl-alt-esc = "exec-and-forget open 'agent-control-center://exit'"
+ctrl-alt-p = "exec-and-forget open 'agent-control-center://pause'"
+[gaps]
+inner.horizontal = 8
+inner.vertical = 8
+outer.left = 8
+outer.right = 8
+outer.top = 8
+outer.bottom = 8
+[[on-window-detected]]
+run = 'layout floating'

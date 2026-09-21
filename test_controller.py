@@ -1,0 +1,33 @@
+import importlib.util,tempfile,unittest
+from pathlib import Path
+from unittest.mock import patch
+spec=importlib.util.spec_from_file_location('control',Path(__file__).with_name('control.py'))
+c=importlib.util.module_from_spec(spec);spec.loader.exec_module(c)
+class Lifecycle(unittest.TestCase):
+ def setUp(self):
+  self.tmp=tempfile.TemporaryDirectory();self.old=c.STATE;c.STATE=Path(self.tmp.name)
+ def tearDown(self): c.STATE=self.old;self.tmp.cleanup()
+ def test_reentry_does_not_launch_duplicates(self):
+  c.save_status('Active')
+  with patch.object(c,'aero',return_value=str(c.ROOT/'config/aerospace.toml')),patch.object(c,'run') as run:
+   self.assertIn('reused',c.enter());run.assert_not_called()
+ def test_pause_preserves_sessions_and_snapshot(self):
+  (c.STATE/'windows.json').write_text('[]')
+  with patch.object(c,'aero') as aero,patch.object(c,'run') as run:
+   c.stop(False);run.assert_not_called()
+   self.assertTrue((c.STATE/'windows.json').exists())
+   self.assertEqual(aero.call_args_list[-1].args,('enable','off'))
+ def test_exit_only_stops_manager(self):
+  with patch.object(c,'aero'),patch.object(c,'run') as run:
+   c.stop(True)
+   self.assertEqual(run.call_args_list[0].args,('launchctl','bootout',c.job('aerospace')))
+   self.assertEqual(run.call_args_list[1].args,(c.APP,'--restore'))
+ def test_permission_failure_does_not_enable_manager(self):
+  with patch.object(c,'aero',return_value=''),patch.object(c,'run',side_effect=RuntimeError('permission')):
+   with self.assertRaises(RuntimeError):c.enter()
+   self.assertFalse((c.STATE/'aerospace.enabled').exists())
+ def test_foreign_manager_not_modified(self):
+  with patch.object(c,'aero',return_value='/another/config'),patch.object(c,'run') as run:
+   with self.assertRaises(RuntimeError):c.enter()
+   run.assert_not_called()
+if __name__=='__main__':unittest.main()

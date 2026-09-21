@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>/Users/richardholguin/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+	</dict>
+	<key>KeepAlive</key>
+	<false/>
+	<key>Label</key>
+	<string>com.richard.acc.terminal.codex</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/usr/bin/open</string>
+		<string>-W</string>
+		<string>-n</string>
+		<string>-a</string>
+		<string>/Applications/Ghostty.app</string>
+		<string>--args</string>
+		<string>--title=ACC · Codex</string>
+		<string>--window-save-state=never</string>
+		<string>--quit-after-last-window-closed=true</string>
+		<string>--working-directory=/Users/richardholguin/Documents</string>
+		<string>-e</string>
+		<string>/opt/homebrew/bin/python3</string>
+		<string>/Users/richardholguin/Documents/Codex/2026-09-20/is-x20/outputs/agent-control-center/terminal.py</string>
+		<string>Codex</string>
+	</array>
+	<key>RunAtLoad</key>
+	<false/>
+	<key>StandardErrorPath</key>
+	<string>/Users/richardholguin/Library/Application Support/AgentControlCenter/terminal.codex.error.log</string>
+	<key>StandardOutPath</key>
+	<string>/Users/richardholguin/Library/Application Support/AgentControlCenter/terminal.codex.log</string>
+	<key>ThrottleInterval</key>
+	<integer>5</integer>
+</dict>
+</plist>
