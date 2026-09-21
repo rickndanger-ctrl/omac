@@ -1,3 +1,7 @@
+# Current portable checkpoint — September 21, 2026
+
+Mini 2 portable aa37223: all five four-terminal grids, native login registration, branded bar, floating guide, repeated entry, disengage preservation, menu/watcher/AeroSpace restart preservation verified live. 16 automated tests and successful/failed installer integration runs pass. Actual reboot, sleep/wake, multiple displays, physical shortcut interception and native idle screensaver activation remain unverified. Historical entries below describe earlier builds and are not current blockers where superseded.
+
 # Verification
 
 - macOS: 27.0 (26A428).
