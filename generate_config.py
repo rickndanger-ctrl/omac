@@ -69,6 +69,9 @@ run = 'layout floating'
 [[on-window-detected]]
 if = 'test %{app-bundle-id} = com.apple.systempreferences'
 run = 'layout floating'
+[[on-window-detected]]
+if = 'test %{app-bundle-id} = com.richardholguin.omac.preview'
+run = 'layout floating'
 '''
 (r/'config/aerospace.toml').write_text(config.replace('CONTROLLER',str(r/'control.py')))
 env={'PATH':str(Path.home()/'.local/bin')+':/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin'}
