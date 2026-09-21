@@ -11,8 +11,8 @@ default-root-container-orientation = 'horizontal'
 persistent-workspaces = ['Agents', 'Research']
 [mode.main.binding]
 [mode.active.binding]
-ctrl-alt-left = 'focus left'
-ctrl-alt-right = 'focus right'
+cmd-left = 'focus --wrap-around dfs-prev'
+cmd-right = 'focus --wrap-around dfs-next'
 ctrl-alt-up = 'focus up'
 ctrl-alt-down = 'focus down'
 ctrl-alt-shift-left = 'move left'
