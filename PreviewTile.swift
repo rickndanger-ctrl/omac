@@ -77,7 +77,7 @@ public final class OmacPreviewTileController: NSObject, NSWindowDelegate, SCStre
             self.previewWindow?.delegate = nil
             self.previewWindow?.close()
             self.previewWindow = nil
-            self.imageView.layer?.contents = nil
+            self.imageView.image = nil
         }
     }
 
@@ -96,7 +96,7 @@ public final class OmacPreviewTileController: NSObject, NSWindowDelegate, SCStre
         DispatchQueue.main.async { [weak self] in
             defer { gate.signal() }
             guard let self, self.stream != nil else { return }
-            self.imageView.layer?.contents = cgImage
+            self.imageView.image = NSImage(cgImage: cgImage, size: .zero)
         }
     }
 
@@ -121,14 +121,14 @@ public final class OmacPreviewTileController: NSObject, NSWindowDelegate, SCStre
 }
 
 @available(macOS 12.3, *)
-private final class PreviewImageView: NSView {
+private final class PreviewImageView: NSImageView {
     var onActivate: (() -> Void)?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         wantsLayer = true
         layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
-        layer?.contentsGravity = .resizeAspect
+        imageScaling = .scaleProportionallyUpOrDown
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
