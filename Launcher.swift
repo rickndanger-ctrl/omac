@@ -228,14 +228,12 @@ class Delegate: NSObject,NSApplicationDelegate {
  let brandBar=OmacBrandBar(logo:root+"/branding/Omac.png")
  var barTimer:Timer?;var barRefreshing=false
  private let shortcutQueue=DispatchQueue(label:"com.richard.omac.shortcut-routing")
- private var routedMode:String?
  @objc func routeShortcuts(_ note:Notification? = nil) {
   let remote=NSWorkspace.shared.frontmostApplication?.bundleIdentifier=="com.apple.ScreenSharing"
   shortcutQueue.async {
    let active=(try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8))=="Active"
    let desired=active && !remote ? "active":"main"
-   guard self.routedMode != desired else {return}
-   if process(aerospace ?? "/missing/aerospace",["mode",desired]).0==0 {self.routedMode=desired}
+   _=process(aerospace ?? "/missing/aerospace",["mode",desired])
   }
  }
  func statusTitle(_ text:String) { refreshBar();routeShortcuts() }
