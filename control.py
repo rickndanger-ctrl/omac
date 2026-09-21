@@ -62,6 +62,9 @@ def arrange():
   aero('focus','--window-id',str(tiles[0]['window-id']))
   aero('flatten-workspace-tree')
   aero('layout','--workspace','Terminals','--root','h_tiles')
+  # Normalize physical order before pairing; titles need not match tree order.
+  for w in reversed(tiles):
+   for _ in tiles: aero('move','--window-id',str(w['window-id']),'left',check=False)
   for i in range(1,len(tiles),2):
    wid=str(tiles[i]['window-id'])
    aero('join-with','--window-id',wid,'left')
