@@ -124,3 +124,6 @@ The separate Omac Tile Lab launches and visibly states that capture starts only 
 - Native source typecheck, generated TOML parsing, and 40 existing regression tests passed. Those 40 tests are not shelf UI coverage.
 - Full installed-app integration, automatic workspace-change tuck, app-launch enrollment, physical Mini 2 behavior, and left/right terminal placement remain unverified. Terminal UI testing was denied by the computer-use tool; no bypass attempted.
 - Existing installed Omac has not been replaced in this checkpoint.
+
+### Mini 1 installed shelf follow-up
+The daily launcher was updated in place after committing its changes, with the prior application backed up. AeroSpace accepted the configuration dry-run and reload. The launchd-managed menu helper restarted successfully. Installed Finder enrollment and selector Return-to-recall worked; switching to page 2 automatically minimized the shelf window, and recall returned the same window ID to page 2. Switching to page 3 minimized it again. The dark 85%-opacity selector and shortcut guide were inspected on screen; Escape dismissed the selector. Cross-Mac deployment and physical shortcut testing remain pending. Existing native menus use dark appearance; their translucency is managed by macOS.
