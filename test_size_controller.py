@@ -14,7 +14,7 @@ class SizeControllerTests(unittest.TestCase):
         control.STATE = Path(self.tmp.name)
         self.window = {
             "window-id": 41, "app-pid": 812, "workspace": "2",
-            "app-name": "Finder", "window-layout": "tiling",
+            "app-name": "Finder", "window-layout": "h_tiles",
         }
         self.focused = json.dumps([self.window])
         self.addCleanup(self._restore)
@@ -22,6 +22,15 @@ class SizeControllerTests(unittest.TestCase):
     def _restore(self):
         control.STATE = self.old_state
         self.tmp.cleanup()
+
+    def test_inventory_explicitly_requests_required_real_cli_fields(self):
+        def actual_cli_shape(*args, **kwargs):
+            if "--format" not in args:
+                return json.dumps([{"window-id": 41, "app-name": "Finder"}])
+            return self.focused
+        with patch.object(control, "aero", side_effect=actual_cli_shape), \
+             patch.object(control, "boot_session", return_value="boot-a"):
+            self.assertIn("full", control.size_window("full"))
 
     def test_full_small_targets_one_window_and_keeps_session(self):
         def aero(*args, **kwargs):

@@ -94,3 +94,11 @@ The daily-use installation has not been replaced. Preview build uses bundled res
 - Built Apple Silicon macOS 14+ DMG; disk-image checksum verification passed (about 10 MB). No original developer checkout path found inside the staged app.
 - This is Apple Development signed, not Developer ID signed or notarized. It is not public-release ready.
 - No native login registration, live upgrade/migration, clean-account boot, or fresh-Mac test has been claimed. No dependency or user permission was installed by packaging.
+
+## Exact native-window targeting checkpoint — September 21
+
+Native `--window-target ID PID` resolves the AX window by WindowServer ID using dynamically resolved `_AXUIElementGetWindow`, rejects missing/ambiguous matches, and selects the display by largest frame intersection. This is a private macOS API and must remain fail-closed when unavailable. Main Mac live probe matched the existing Codex window; an invalid ID was rejected.
+
+A temporary Finder window was floated explicitly and resized through the new `--window-half ID PID` prototype command. A no-margin request was rejected and rolled back when macOS clamped the frame. The eight-pixel-margin target passed exact bounds readback, and the Finder window was visually inspected via CUA, then closed by its specific window ID. No installed Omac binary or bindings were changed. Multi-window/sibling isolation, Mini 2, original tree-slot restoration, and controller integration remain pending.
+
+Fixed actual CLI contract: default AeroSpace JSON omits PID/workspace/layout, so the controller now requests these fields explicitly; real tiled layouts are h_tiles/v_tiles. Included tile_modes.py in the packaging manifest. Unit suite: 35 passed.

@@ -106,7 +106,7 @@ def _ax_half(window_id,app_pid):
 def size_window(mode):
  try: mode=Mode(mode)
  except (TypeError,ValueError) as exc: raise RuntimeError('size must be small, half, or full') from exc
- focused=json.loads(aero('list-windows','--focused','--json'))
+ focused=json.loads(aero('list-windows','--focused','--format','%{window-id} %{app-pid} %{workspace} %{window-layout}','--json'))
  if not focused: raise RuntimeError('Focus a window first.')
  window=focused[0]
  try:
@@ -116,7 +116,7 @@ def size_window(mode):
  if workspace not in ('1','2','3','4','5'): raise RuntimeError('Focused window is outside an Omac page.')
  key=_tile_mode_key(identity);saved=_load_tile_modes();record=saved.get(key,{})
  original_layout=window.get('window-layout')
- if not record and original_layout!='tiling':
+ if not record and original_layout not in ('tiling','h_tiles','v_tiles'):
   raise RuntimeError('Size modes require a tiled window so its original slot can be restored.')
  planner=TileModePlanner(WindowSnapshot(identity,workspace,str(identity.window_id)))
  try: planner.mode=Mode(record.get('mode',Mode.SMALL.value))
@@ -125,7 +125,7 @@ def size_window(mode):
  if intent.action=='noop': return f'Window already {mode.value}.'
  wid=str(identity.window_id)
  if mode is Mode.SMALL:
-  if record.get('original_layout','tiling')!='tiling':
+  if record.get('original_layout','tiling') not in ('tiling','h_tiles','v_tiles'):
    raise RuntimeError('Cannot restore the original tile slot safely.')
   aero('fullscreen','off','--window-id',wid)
   aero('layout','--window-id',wid,'tiling')
@@ -310,7 +310,7 @@ def main():
   elif action=='recover': print(recover())
   elif action in ('enter','four','six','new'): print(enter(6 if action=='six' else (4 if action=='four' else 0),add=action=='new'))
   elif action=='center':
-   focused=json.loads(aero('list-windows','--focused','--json'))
+   focused=json.loads(aero('list-windows','--focused','--format','%{window-id} %{app-pid} %{workspace} %{window-layout}','--json'))
    if not focused: raise RuntimeError('Focus a window first.')
    wid=str(focused[0]['window-id'])
    layout=aero('list-windows','--focused','--format','%{window-layout}')

@@ -2,6 +2,64 @@ import Cocoa
 import ApplicationServices
 import WebKit
 import ServiceManagement
+import Cocoa
+import ApplicationServices
+
+// AeroSpace uses the same WindowServer ID. Resolve it on the AX element rather
+// than relying on titles, list order, or whichever app window has focus.
+// Private macOS API: keep this isolated and fail closed if unavailable.
+typealias AXWindowIDFunction = @convention(c) (AXUIElement, UnsafeMutablePointer<CGWindowID>) -> AXError
+
+enum NativeTargetError: Error { case unavailable, permission, missing, ambiguous, geometry }
+
+struct NativeWindowTarget {
+    let element: AXUIElement
+    let frame: CGRect
+    let visibleFrame: CGRect
+
+    static func resolve(id: CGWindowID, pid: pid_t) throws -> NativeWindowTarget {
+        guard AXIsProcessTrusted() else { throw NativeTargetError.permission }
+        guard let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "_AXUIElementGetWindow") else {
+            throw NativeTargetError.unavailable
+        }
+        let getID = unsafeBitCast(symbol, to: AXWindowIDFunction.self)
+        let app = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(app, 1)
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &value) == .success,
+              let windows = value as? [AXUIElement] else { throw NativeTargetError.missing }
+        let matches = windows.filter { window in
+            var candidate: CGWindowID = 0
+            return getID(window, &candidate) == .success && candidate == id
+        }
+        guard matches.count == 1 else { throw NativeTargetError.ambiguous }
+        let window = matches[0]
+        func axValue(_ key: String) throws -> AXValue {
+            var result: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(window, key as CFString, &result) == .success,
+                  let result, CFGetTypeID(result) == AXValueGetTypeID() else { throw NativeTargetError.geometry }
+            return unsafeBitCast(result, to: AXValue.self)
+        }
+        var point = CGPoint.zero, size = CGSize.zero
+        guard AXValueGetValue(try axValue(kAXPositionAttribute), .cgPoint, &point),
+              AXValueGetValue(try axValue(kAXSizeAttribute), .cgSize, &size),
+              size.width > 0, size.height > 0 else { throw NativeTargetError.geometry }
+        let frame = CGRect(origin: point, size: size)
+        // AX uses the primary display's upper-left as origin, AppKit lower-left.
+        guard let primary = NSScreen.screens.first else { throw NativeTargetError.geometry }
+        func axRect(_ rect: CGRect) -> CGRect {
+            CGRect(x: rect.minX, y: primary.frame.maxY - rect.maxY, width: rect.width, height: rect.height)
+        }
+        let ranked = NSScreen.screens.map { screen -> (NSScreen, CGFloat) in
+            let overlap = frame.intersection(axRect(screen.frame))
+            return (screen, overlap.isNull ? 0 : overlap.width * overlap.height)
+        }.sorted { $0.1 > $1.1 }
+        guard let best = ranked.first, best.1 > 0,
+              ranked.count == 1 || best.1 > ranked[1].1 else { throw NativeTargetError.ambiguous }
+        return NativeWindowTarget(element: window, frame: frame, visibleFrame: axRect(best.0.visibleFrame))
+    }
+}
+
 let root = Bundle.main.resourceURL!.appendingPathComponent("Payload").path
 let appExecutable = Bundle.main.executableURL!.path
 func installedExecutable(_ candidates:[String])->String? {candidates.first{FileManager.default.isExecutableFile(atPath:$0)}}
@@ -35,6 +93,37 @@ func missingDependencies()->[String] {
  }
  if !FileManager.default.fileExists(atPath:root+"/control.py") {missing.append("Omac bundled resources")}
  return missing
+}
+if let index = CommandLine.arguments.firstIndex(of: "--window-half"), CommandLine.arguments.count > index + 2 {
+ do {
+  guard let id=UInt32(CommandLine.arguments[index+1]),let pid=Int32(CommandLine.arguments[index+2]) else {throw NativeTargetError.missing}
+  let target=try NativeWindowTarget.resolve(id:id,pid:pid)
+  var desired=target.visibleFrame.insetBy(dx:8,dy:8);desired.size.width=floor((desired.width-8)/2)
+  func setFrame(_ frame:CGRect) throws {
+   var point=frame.origin,size=frame.size
+   guard let p=AXValueCreate(.cgPoint,&point),let z=AXValueCreate(.cgSize,&size),
+    AXUIElementSetAttributeValue(target.element,kAXPositionAttribute as CFString,p) == .success,
+    AXUIElementSetAttributeValue(target.element,kAXSizeAttribute as CFString,z) == .success else {throw NativeTargetError.geometry}
+  }
+  do {
+   try setFrame(desired)
+   // Native apps may settle their constraints on a later run-loop iteration.
+   RunLoop.current.run(until:Date(timeIntervalSinceNow:0.15))
+   let actual=try NativeWindowTarget.resolve(id:id,pid:pid).frame
+   guard abs(actual.minX-desired.minX)<2,abs(actual.minY-desired.minY)<2,
+    abs(actual.width-desired.width)<2,abs(actual.height-desired.height)<2 else {fputs("Requested \(desired), got \(actual)\n",stderr);throw NativeTargetError.geometry}
+   print("Verified exact half-screen for selected window");exit(0)
+  } catch {try? setFrame(target.frame);throw error}
+ } catch {fputs("Half-screen refused or rolled back: \(error)\n",stderr);exit(1)}
+}
+if let index = CommandLine.arguments.firstIndex(of: "--window-target"), CommandLine.arguments.count > index + 2 {
+ do {
+  guard let id = UInt32(CommandLine.arguments[index+1]), let pid = Int32(CommandLine.arguments[index+2]) else {throw NativeTargetError.missing}
+  let target = try NativeWindowTarget.resolve(id:id,pid:pid)
+  func rect(_ r:CGRect)->[Double] {[r.minX,r.minY,r.width,r.height].map(Double.init)}
+  let data = try JSONSerialization.data(withJSONObject:["windowID":id,"pid":pid,"frame":rect(target.frame),"visibleFrame":rect(target.visibleFrame)])
+  print(String(data:data,encoding:.utf8)!);exit(0)
+ } catch {fputs("Cannot resolve exact window and display: \(error)\n",stderr);exit(1)}
 }
 if CommandLine.arguments.contains("--check") {
  let missing=missingDependencies()
