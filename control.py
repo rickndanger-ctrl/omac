@@ -24,7 +24,8 @@ def load(name):
 def windows(): return json.loads(aero('list-windows','--all','--json'))
 def ready():
  for _ in range(30):
-  try: windows(); return
+  try:
+   aero('enable','on'); windows(); return
   except Exception: time.sleep(.2)
  raise RuntimeError('AeroSpace is not ready. Grant AeroSpace Accessibility access in System Settings, then try Enter again.')
 def save_status(value): (STATE/'status').write_text(value)
