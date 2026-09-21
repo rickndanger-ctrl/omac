@@ -23,3 +23,6 @@ Native Terminal Shortcuts panel verified through its accessibility tree. Center 
 
 ## Incremental opening
 Command-Return live test increased managed windows from four to five, retained all original window IDs, and left Ghostty focused. Six lifecycle tests passed. New Terminal now skips reload/rearrange during an active session; non-help URL actions use background activation. Dark background config validates. Visual startup flash elimination remains unconfirmed.
+
+## Reversible center and balance
+Live center action changed the focused terminal from tiled to floating, then back to v_tiles on the second invocation. Resized a tile and successfully dispatched both cmd-b and cmd-shift-equal against the explicit Terminals workspace. Physical key delivery and pixel-equal geometry were not independently measured.
