@@ -73,14 +73,10 @@ final class OverlayContentView: NSView {
         button.action = #selector(returnToDesktop)
         button.bezelStyle = .rounded
         button.keyEquivalent = "\r"
-        button.translatesAutoresizingMaskIntoConstraints = false
+        button.frame = NSRect(x: max(16, bounds.width - 182), y: 28, width: 150, height: 34)
+        button.autoresizingMask = [.minXMargin, .maxYMargin]
+        button.contentTintColor = .white
         addSubview(button)
-        NSLayoutConstraint.activate([
-            button.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -32),
-            button.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -28),
-            button.widthAnchor.constraint(greaterThanOrEqualToConstant: 150),
-            button.heightAnchor.constraint(equalToConstant: 34)
-        ])
     }
 
     required init?(coder: NSCoder) { nil }
