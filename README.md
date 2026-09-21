@@ -11,3 +11,6 @@ Pause releases window management and shortcuts. Exit also stops the owned manage
 Rollback: run `/opt/homebrew/bin/python3 control.py rollback` from this repository. This disables Control Center without closing terminals. Dependency apps remain installed.
 
 Build Launcher.swift using swiftc with Cocoa and ApplicationServices, install its executable into /Applications/Agent Control Center.app/Contents/MacOS, then codesign the bundle. generate_config.py regenerates dedicated config and launchd plists. Run test_controller.py for lifecycle checks. See VERIFICATION.md for live testing limits.
+
+## Window controls and appearance
+Command-K opens the native shortcut panel. Command-O centers a floating terminal; Command-T returns it to tiling. Command-F enlarges within the workspace; Command-Option-F toggles native macOS fullscreen. Option-Tab cycles windows and Command-Shift-equals balances tiles. New terminal instances load config/ghostty.conf (94% opacity and blur 16); running sessions retain their existing appearance until reopened. Native macOS fullscreen disables transparency. Build now also links WebKit.
