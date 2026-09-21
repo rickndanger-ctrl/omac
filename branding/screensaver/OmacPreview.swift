@@ -17,7 +17,10 @@ final class PreviewController: NSObject, NSApplicationDelegate {
         let initialPhase = Double(max(0, min(3, scene ?? 0))) * 8.0
         window.contentView = OmacRendererView(frame: NSRect(origin: .zero, size: size), initialPhase: initialPhase)
         window.makeKeyAndOrderFront(nil)
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            if let text=event.charactersIgnoringModifiers,let scene=Int(text),(1...4).contains(scene) {
+                (self?.window.contentView as? OmacRendererView)?.selectScene(scene-1);return nil
+            }
             if event.keyCode == 53 { NSApp.terminate(nil); return nil }
             return event
         }

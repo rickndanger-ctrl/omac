@@ -50,6 +50,11 @@ final class OmacRendererView: NSView {
         RunLoop.main.add(timer!, forMode: .common)
     }
 
+    func selectScene(_ scene: Int) {
+        phase = Double(max(0,min(3,scene))) * 8 + 2
+        lastTick = Date(); needsDisplay = true
+    }
+
     func stopAnimating() {
         timer?.invalidate()
         timer = nil
