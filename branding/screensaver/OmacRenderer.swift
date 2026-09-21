@@ -93,18 +93,35 @@ final class OmacRendererView: NSView {
         let logoHeight = CGFloat(logo.count) * lineHeight
         let origin = CGPoint(x: (bounds.width - logoWidth) / 2, y: (bounds.height - logoHeight) / 2 - fontSize * 0.4)
 
+        // Four short terminal moods repeat: rain, scan, cursor, and glitch.
+        // Each is deterministic so the saver stays calm and cheap to render.
+        let effect = reduceMotion ? 0 : Int(phase / 3.0) % 4
+        let effectProgress = reduceMotion ? 0.0 : phase.truncatingRemainder(dividingBy: 3.0) / 3.0
+
         for (index, line) in stream.enumerated() {
             let y = 18 + CGFloat(index) * (smallFont.pointSize + 8)
-            let alpha = 0.08 + CGFloat((index % 3)) * 0.025
+            let alpha = effect == 0 ? 0.08 + CGFloat((index % 3)) * 0.025 : 0.035 + CGFloat((index % 2)) * 0.018
             (line as NSString).draw(at: CGPoint(x: 24, y: y), withAttributes: [
                 .font: smallFont,
                 .foregroundColor: NSColor(calibratedRed: 0.48, green: 0.72, blue: 0.34, alpha: alpha)
             ])
         }
 
+        if effect == 1 {
+            let scanY = bounds.height * CGFloat(effectProgress)
+            context.setFillColor(NSColor(calibratedRed: 0.60, green: 0.85, blue: 0.40, alpha: 0.10).cgColor)
+            context.fill(CGRect(x: 0, y: scanY, width: bounds.width, height: max(1, fontSize * 0.08)))
+        } else if effect == 2 {
+            let cursor = "▌"
+            (cursor as NSString).draw(at: CGPoint(x: origin.x + logoWidth + 8, y: origin.y + logoHeight - lineHeight), withAttributes: [
+                .font: font,
+                .foregroundColor: NSColor(calibratedRed: 0.60, green: 0.85, blue: 0.40, alpha: effectProgress < 0.5 ? 0.8 : 0.15)
+            ])
+        }
+
         let cycle = reduceMotion ? 1.0 : phase.truncatingRemainder(dividingBy: 12.0) / 12.0
         for (index, line) in logo.enumerated() {
-            let wobble = reduceMotion ? 0 : sin(phase + Double(index) * 0.7) * 1.2
+            let wobble = reduceMotion ? 0 : sin(phase + Double(index) * 0.7) * (effect == 3 ? 2.8 : 1.2)
             let color = NSColor(calibratedRed: 0.60, green: 0.85, blue: 0.40, alpha: 0.94)
             let reveal: Double
             if reduceMotion || cycle >= 0.17 && cycle < 0.67 { reveal = 1 }
@@ -118,6 +135,13 @@ final class OmacRendererView: NSView {
                 .font: font,
                 .foregroundColor: color
             ])
+            if effect == 3 && index % 3 == 0 {
+                let ghost = String(assembled.dropFirst(min(2, assembled.count)))
+                (ghost as NSString).draw(at: CGPoint(x: origin.x - 2, y: origin.y + CGFloat(index) * lineHeight), withAttributes: [
+                    .font: font,
+                    .foregroundColor: NSColor(calibratedRed: 0.48, green: 0.72, blue: 0.34, alpha: 0.20)
+                ])
+            }
         }
 
     }

@@ -19,7 +19,7 @@
 		<string>-a</string>
 		<string>/Applications/Ghostty.app</string>
 		<string>--args</string>
-		<string>--title=ACC · 7</string>
+		<string>--title=Omac · 7</string>
 		<string>--config-file=/Users/richardholguin/Documents/Codex/2026-09-20/is-x20/outputs/agent-control-center/config/ghostty.conf</string>
 		<string>--working-directory=/Users/richardholguin/Documents</string>
 	</array>

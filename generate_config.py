@@ -43,7 +43,7 @@ cmd-shift-down = 'swap down'
 cmd-minus = 'resize smart -50'
 cmd-equal = 'resize smart +50'
 cmd-f = 'fullscreen'
-cmd-k = 'exec-and-forget "/Applications/Agent Control Center.app/Contents/MacOS/AgentControlCenter" --guide' 
+cmd-k = 'exec-and-forget "/Applications/Omac.app/Contents/MacOS/AgentControlCenter" --guide' 
 cmd-o = "exec-and-forget open -g 'agent-control-center://center'"
 cmd-t = 'layout floating tiling'
 cmd-alt-f = 'macos-native-fullscreen'
@@ -75,12 +75,12 @@ run = 'layout floating'
 '''
 (r/'config/aerospace.toml').write_text(config.replace('CONTROLLER',str(r/'control.py')))
 env={'PATH':str(Path.home()/'.local/bin')+':/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin'}
-app='/Applications/Agent Control Center.app/Contents/MacOS/AgentControlCenter'
+app='/Applications/Omac.app/Contents/MacOS/AgentControlCenter'
 for name,args,keep in [
  ('watcher',['/opt/homebrew/bin/python3',str(r/'watcher.py')],{'PathState':{str(s/'aerospace.enabled'):True}}),
  ('login',[app,'--login'],False),
  ('menu',[app,'--managed'],{'PathState':{str(s/'menu.enabled'):True}}),
  ('aerospace',['/Applications/AeroSpace.app/Contents/MacOS/AeroSpace','--config-path',str(r/'config/aerospace.toml')],{'PathState':{str(s/'aerospace.enabled'):True}}),
- *[('terminal.'+role.lower(),['/usr/bin/open','-W','-n','-a','/Applications/Ghostty.app','--args','--title=ACC · '+role,'--config-file='+str(r/'config/ghostty.conf'),'--working-directory='+str(Path.home()/'Documents')],False) for role in [str(i) for i in range(1,31)]]]:
+ *[('terminal.'+role.lower(),['/usr/bin/open','-W','-n','-a','/Applications/Ghostty.app','--args','--title=Omac · '+role,'--config-file='+str(r/'config/ghostty.conf'),'--working-directory='+str(Path.home()/'Documents')],False) for role in [str(i) for i in range(1,31)]]]:
  d={'Label':'com.richard.acc.'+name,'ProgramArguments':args,'RunAtLoad':name=='login','KeepAlive':keep,'ThrottleInterval':5,'EnvironmentVariables':env,'StandardOutPath':str(s/(name+'.log')),'StandardErrorPath':str(s/(name+'.error.log'))}
  (r/'launchd'/f'{name}.plist').write_bytes(plistlib.dumps(d))

@@ -1,4 +1,4 @@
-# Omac — Mac Agent Control Center
+# Omac — Mac Omac
 
 An on-demand or sign-in-started Mac workspace: five persistent AeroSpace pages, Ghostty terminal grids, desktop apps, a compact native shortcut palette, and Omac appearance choices. No agent commands, paid APIs, or model choices are launched automatically.
 
@@ -40,3 +40,10 @@ To stop automatic startup, select **Disable Login Startup**. To disable the full
 This removes the login job, stops management/checkpointing/menu helpers, restores saved windows/wallpaper where possible, and preserves files. It does not uninstall the screensaver; choose another saver in Settings, then move `~/Library/Screen Savers/OMAC.saver` to Trash if desired.
 
 See `VERIFICATION.md` for actual evidence and remaining hardware tests. Compilation alone is not a claim of sleep/wake, reboot, or multi-display reliability.
+
+## Omac Dock launcher
+Open `/Applications/Omac.app` to engage Omac. Clicking its running Dock icon engages/resumes it; right-click the icon for the same controls as the green Omac menu-bar item. **Disengage Omac** (Control–Option–Escape) releases tiling and shortcuts and restores saved windows/wallpaper where possible, leaving terminal sessions running. The app stays available for re-entry. Quit Omac also stops its supervised launcher.
+
+User-visible branding is Omac. Existing bundle identifiers and storage paths remain stable to preserve permissions and saved sessions. Existing terminals retain their old titles until closed; newly created terminals are titled Omac.
+
+Build with `./build.sh`. Commit changes before installation, then run `OMAC_SIGN_IDENTITY=<existing Apple Development identity> ./install.sh`. Never replace the installed signing identity with an ad-hoc signature.

@@ -8,7 +8,7 @@ STATE=Path.home()/'Library/Application Support/AgentControlCenter'
 STATE.mkdir(parents=True,exist_ok=True)
 DOMAIN=f'gui/{os.getuid()}'
 AERO='/opt/homebrew/bin/aerospace'
-APP='/Applications/Agent Control Center.app/Contents/MacOS/AgentControlCenter'
+APP='/Applications/Omac.app/Contents/MacOS/AgentControlCenter'
 ROLES=[str(i) for i in range(1,31)]
 
 def run(*args,check=True):
@@ -101,7 +101,7 @@ def terminal_windows(workspace=None):
   title=w.get('window-title','')
   for role in ROLES:
    canonical='ACC · '+role
-   if title.endswith(canonical):
+   if title.endswith(canonical) or title.endswith('Omac · '+role):
     result.append(dict(w,**{'window-title':canonical})); break
  return sorted(result,key=lambda w:(w['window-title'],w['window-id']))
 
@@ -135,7 +135,7 @@ def start_services():
 def enter(count=0,add=False):
  existing=aero('config','--config-path',check=False)
  if existing and existing!=str(ROOT/'config/aerospace.toml'):
-  raise RuntimeError('Another AeroSpace configuration is active. Exit it before entering Control Center.')
+  raise RuntimeError('Another AeroSpace configuration is active. Exit it before entering Omac.')
  active=existing==str(ROOT/'config/aerospace.toml') and (STATE/'status').exists() and (STATE/'status').read_text()=='Active'
  if not active:
   run(APP,'--snapshot')
@@ -273,7 +273,7 @@ def main():
    stop(True)
    (STATE/'menu.enabled').unlink(missing_ok=True)
    run('launchctl','bootout',job('menu'),check=False)
-   print('Control Center disabled. Agent terminals were not stopped. No global configuration was changed.')
+   print('Omac disabled. Agent terminals were not stopped. No global configuration was changed.')
   else: raise RuntimeError('Unknown action')
 if __name__=='__main__':
  try: main()

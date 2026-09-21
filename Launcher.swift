@@ -43,7 +43,7 @@ if let index=CommandLine.arguments.firstIndex(of:"--center"), CommandLine.argume
  print("Centered terminal");exit(0)
 }
 if CommandLine.arguments.contains("--snapshot") {
- guard AXIsProcessTrusted() else { fputs("Grant Agent Control Center Accessibility access in System Settings before entering.\n",stderr); exit(2) }
+ guard AXIsProcessTrusted() else { fputs("Grant Omac Accessibility access in System Settings before entering.\n",stderr); exit(2) }
  if !FileManager.default.fileExists(atPath:snapshot.path) {
   var saved = [[String:Any]]()
   eachWindow { app,w,index in
@@ -107,28 +107,38 @@ if CommandLine.arguments.contains("--guide") {
  exit(0)
 }
 if CommandLine.arguments.contains("--login") {
- guard AXIsProcessTrusted() else {fputs("Grant Agent Control Center Device Control access before login startup.\n",stderr);exit(2)}
+ guard AXIsProcessTrusted() else {fputs("Grant Omac Device Control access before login startup.\n",stderr);exit(2)}
  let result=process("/opt/homebrew/bin/python3",[root+"/control.py","login"])
  if !result.1.isEmpty {fputs(result.1, result.0==0 ? stdout:stderr)}
  exit(result.0)
 }
 if !CommandLine.arguments.contains("--managed") {
+ FileManager.default.createFile(atPath:state.appendingPathComponent("engage.request").path,contents:Data())
  FileManager.default.createFile(atPath:state.appendingPathComponent("menu.enabled").path,contents:Data())
  let job="gui/\(getuid())/com.richard.acc.menu"
  if process("/bin/launchctl",["print",job]).0 != 0 { _=process("/bin/launchctl",["bootstrap","gui/\(getuid())",root+"/launchd/menu.plist"]) }
- _=process("/bin/launchctl",["kickstart",job]); exit(0)
+ _=process("/bin/launchctl",["kickstart",job]);
+ DistributedNotificationCenter.default().postNotificationName(NSNotification.Name("com.richard.acc.engage"),object:nil,userInfo:nil,deliverImmediately:true)
+ RunLoop.current.run(until:Date(timeIntervalSinceNow:0.15)); exit(0)
 }
 class GuidePanel: NSPanel {
  override func cancelOperation(_ sender:Any?) {orderOut(nil)}
 }
 class Delegate: NSObject,NSApplicationDelegate {
  var item:NSStatusItem!; var busy=false; var guide:GuidePanel?
+ func statusTitle(_ text:String) {
+  item.button?.attributedTitle=NSAttributedString(string:text,attributes:[.foregroundColor:NSColor(calibratedRed:0.62,green:0.87,blue:0.39,alpha:1),.font:NSFont.systemFont(ofSize:13,weight:.medium)])
+ }
+ @objc func engageNotification(_ note:Notification) {try? FileManager.default.removeItem(at:state.appendingPathComponent("engage.request"));perform("enter")}
+ func applicationShouldHandleReopen(_ sender:NSApplication,hasVisibleWindows flag:Bool)->Bool {perform("enter");return true}
+ func applicationDockMenu(_ sender:NSApplication)->NSMenu? {item.menu}
+
  func applicationDidFinishLaunching(_ note:Notification) {
   NSAppleEventManager.shared().setEventHandler(self,andSelector:#selector(urlEvent(_:reply:)),forEventClass:AEEventClass(kInternetEventClass),andEventID:AEEventID(kAEGetURL))
   DistributedNotificationCenter.default().addObserver(self,selector:#selector(showGuideNotification(_:)),name:NSNotification.Name("com.richard.acc.showGuide"),object:nil,suspensionBehavior:.deliverImmediately)
-  item=NSStatusBar.system.statusItem(withLength:NSStatusItem.variableLength); item.button?.title="▦ Omac"
+  item=NSStatusBar.system.statusItem(withLength:NSStatusItem.variableLength); statusTitle("▦ Omac")
   let menu=NSMenu()
-  for (title,action) in [("Enter / Resume Five Pages","enter"),("Open / Arrange 4 Terminals","four"),("Open / Arrange 6 Terminals","six"),("New Terminal (up to 6)","new"),("Pause Tiling and Shortcuts","pause"),("Exit and Restore Windows","exit"),("Shortcut Guide","guide"),("Accessibility Settings","access"),("Start Omac at Login","enable-login"),("Disable Login Startup","disable-login"),("Quit Launcher","quit")] {
+  for (title,action) in [("Engage Omac","enter"),("Open / Arrange 4 Terminals","four"),("Open / Arrange 6 Terminals","six"),("New Terminal (up to 6)","new"),("Pause Tiling and Shortcuts","pause"),("Disengage Omac — Restore Windows","exit"),("Shortcut Guide","guide"),("Accessibility Settings","access"),("Start Omac at Login","enable-login"),("Disable Login Startup","disable-login"),("Quit Omac","quit")] {
    let m=NSMenuItem(title:title,action:#selector(selected(_:)),keyEquivalent:""); m.representedObject=action; m.target=self; menu.addItem(m)
   }
   menu.addItem(.separator())
@@ -151,10 +161,14 @@ class Delegate: NSObject,NSApplicationDelegate {
   for (title,value) in [("Green Glass Wallpaper","obsidian"),("Amber Glass Wallpaper","amber"),("Silver Glass Wallpaper","pine")] {
    let entry=NSMenuItem(title:title,action:#selector(selectWallpaper(_:)),keyEquivalent:"");entry.representedObject=value;entry.target=self;appearanceMenu.addItem(entry)
   }
-  let saver=NSMenuItem(title:"Screen Saver Settings…",action:#selector(openSettings(_:)),keyEquivalent:"")
-  saver.representedObject="x-apple.systempreferences:com.apple.ScreenSaver-Settings.extension";saver.target=self;appearanceMenu.addItem(saver)
+  let saver=NSMenuItem(title:"Wallpaper & Screen Saver…",action:#selector(openSettings(_:)),keyEquivalent:"")
+  saver.representedObject="x-apple.systempreferences:com.apple.Wallpaper-Settings.extension";saver.target=self;appearanceMenu.addItem(saver)
   appearance.submenu=appearanceMenu;menu.addItem(appearance)
   item.menu=menu
+  let main=NSMenu();let appItem=NSMenuItem();main.addItem(appItem);appItem.submenu=menu.copy() as? NSMenu;NSApp.mainMenu=main
+  DistributedNotificationCenter.default().addObserver(self,selector:#selector(engageNotification(_:)),name:NSNotification.Name("com.richard.acc.engage"),object:nil,suspensionBehavior:.deliverImmediately)
+  if FileManager.default.fileExists(atPath:state.appendingPathComponent("engage.request").path) {engageNotification(Notification(name:Notification.Name("com.richard.acc.engage")));return}
+
   // Resume an active session after launchd restarts this menu helper.
   if (try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8)) == "Active" { perform("enter") }
  }
@@ -214,17 +228,17 @@ class Delegate: NSObject,NSApplicationDelegate {
    NSWorkspace.shared.open(URL(string:"x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!); return
   }
   if ["pause","exit","quit"].contains(action) {guide?.orderOut(nil)}
-  guard !busy else {return}; busy=true; item.button?.title="▦ Working…"
+  guard !busy else {return}; busy=true; statusTitle("▦ Omac · Working…")
   DispatchQueue.global().async {
    let result=process("/opt/homebrew/bin/python3",[root+"/control.py",action=="quit" ? "exit":action])
    DispatchQueue.main.async {
     self.busy=false
     let status=(try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8)) ?? "Inactive"
-    self.item.button?.title="▦ Omac · \(status)"
-    if result.0 != 0 { let alert=NSAlert();alert.messageText="Control Center needs attention";alert.informativeText=result.1;NSApp.activate(ignoringOtherApps:true);alert.runModal() }
+    self.statusTitle("▦ Omac · \(status)")
+    if result.0 != 0 { let alert=NSAlert();alert.messageText="Omac needs attention";alert.informativeText=result.1;NSApp.activate(ignoringOtherApps:true);alert.runModal() }
     if action=="quit" {try? FileManager.default.removeItem(at:state.appendingPathComponent("menu.enabled"));NSApp.terminate(nil)}
    }
   }
  }
 }
-let app=NSApplication.shared; let delegate=Delegate();app.delegate=delegate;app.setActivationPolicy(.accessory);app.run()
+let app=NSApplication.shared; let delegate=Delegate();app.delegate=delegate;app.setActivationPolicy(.regular);app.run()

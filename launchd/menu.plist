@@ -19,7 +19,7 @@
 	<string>com.richard.acc.menu</string>
 	<key>ProgramArguments</key>
 	<array>
-		<string>/Applications/Agent Control Center.app/Contents/MacOS/AgentControlCenter</string>
+		<string>/Applications/Omac.app/Contents/MacOS/AgentControlCenter</string>
 		<string>--managed</string>
 	</array>
 	<key>RunAtLoad</key>

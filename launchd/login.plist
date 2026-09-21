@@ -13,7 +13,7 @@
 	<string>com.richard.acc.login</string>
 	<key>ProgramArguments</key>
 	<array>
-		<string>/Applications/Agent Control Center.app/Contents/MacOS/AgentControlCenter</string>
+		<string>/Applications/Omac.app/Contents/MacOS/AgentControlCenter</string>
 		<string>--login</string>
 	</array>
 	<key>RunAtLoad</key>
