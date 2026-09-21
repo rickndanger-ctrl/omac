@@ -120,6 +120,7 @@ class Delegate: NSObject,NSApplicationDelegate {
    // Capture the page before focusing the panel; open -g prevents premature activation.
    let current=process("/opt/homebrew/bin/aerospace",["list-workspaces","--focused"])
    let page=current.1.trimmingCharacters(in:.whitespacesAndNewlines)
+   guide?.close();guide=nil
    if guide==nil {
     let panel=GuidePanel(contentRect:NSRect(x:0,y:0,width:620,height:570),styleMask:[.titled,.closable,.fullSizeContentView],backing:.buffered,defer:false)
     panel.title="Shortcuts";panel.titleVisibility = .hidden;panel.titlebarAppearsTransparent=true
@@ -135,7 +136,7 @@ class Delegate: NSObject,NSApplicationDelegate {
    if current.0==0 {
     _=process("/opt/homebrew/bin/aerospace",["move-node-to-workspace","--window-id",String(panel.windowNumber),page])
    }
-   panel.center();panel.orderFrontRegardless()
+   panel.center();panel.makeKeyAndOrderFront(nil);NSApp.activate(ignoringOtherApps:true)
    // Newly shown windows are detected asynchronously by AeroSpace.
    DispatchQueue.main.asyncAfter(deadline:.now()+0.15) {
     if current.0==0 {
