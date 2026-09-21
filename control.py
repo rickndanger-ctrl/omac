@@ -142,12 +142,22 @@ def main():
    focused=json.loads(aero('list-windows','--focused','--json'))
    if not focused or focused[0].get('app-name')!='Ghostty': raise RuntimeError('Focus a terminal first.')
    wid=str(focused[0]['window-id'])
-   pid=aero('list-windows','--focused','--format','%{app-pid}')
-   aero('fullscreen','off','--window-id',wid)
-   aero('layout','--window-id',wid,'floating')
-   run(APP,'--center',pid)
-   aero('focus','--window-id',wid)
-   print('Terminal centered; Command-T returns it to tiling.')
+   layout=aero('list-windows','--focused','--format','%{window-layout}')
+   if layout=='floating':
+    aero('layout','--window-id',wid,'tiling')
+    aero('balance-sizes','--workspace','Terminals')
+    aero('focus','--window-id',wid)
+    print('Terminal returned to tiling.')
+   else:
+    pid=aero('list-windows','--focused','--format','%{app-pid}')
+    aero('fullscreen','off','--window-id',wid)
+    aero('layout','--window-id',wid,'floating')
+    try: run(APP,'--center',pid)
+    except Exception:
+     aero('layout','--window-id',wid,'tiling')
+     raise
+    aero('focus','--window-id',wid)
+    print('Terminal centered; Command-O returns it to tiling.')
   elif action in ('pause','exit'): print(stop(action=='exit'))
   elif action=='status': print((STATE/'status').read_text() if (STATE/'status').exists() else 'Inactive')
   elif action=='rollback':
