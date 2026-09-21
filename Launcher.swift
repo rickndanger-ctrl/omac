@@ -348,6 +348,7 @@ class Delegate: NSObject,NSApplicationDelegate {
  var shelfIDs:[CGWindowID]=[]
  var shelfPage:String?
  var shelfTransition=false
+ var shelfLaunchID=UUID()
  func shelfActive()->Bool {(try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8)) == "Active"}
  func currentShelfPage()->String {process(aerospace ?? "/missing/aerospace",["list-workspaces","--focused"]).1.trimmingCharacters(in:.whitespacesAndNewlines)}
  func shelfError(_ error:Error) {let alert=NSAlert();alert.messageText="Omac app shelf";alert.informativeText=String(describing:error);alert.runModal()}
@@ -375,7 +376,7 @@ class Delegate: NSObject,NSApplicationDelegate {
  }
  @objc func shelfAction(_ note:Notification) {if let action=note.userInfo?["action"] as? String,["shelf","shelf-add","shelf-tuck","place-left","place-right","menu"].contains(action) {perform(action)}}
  @objc func shelfPageChanged(_ note:Notification) {
-  guard shelfActive(),!shelfTransition,!shelf.entries.isEmpty else{return}
+  guard shelfActive(),!shelfTransition else{return}
   let page=currentShelfPage()
   guard page != shelfPage else{return}
   do {try shelf.tuckAll();shelfPage=page;shelfPanel.orderOut(nil)} catch {shelfError(error)}
@@ -484,14 +485,37 @@ class Delegate: NSObject,NSApplicationDelegate {
  func launchShelfApp(_ bundle:String) {
   if let entry=shelf.entries.first(where:{$0.bundleIdentifier==bundle}),shelfActive() {summonShelf(entry.windowID);return}
   guard let url=NSWorkspace.shared.urlForApplication(withBundleIdentifier:bundle) else{return}
-  NSWorkspace.shared.openApplication(at:url,configuration:NSWorkspace.OpenConfiguration()) { [weak self] app,error in
-   guard let app,error == nil else{return}
-   DispatchQueue.main.asyncAfter(deadline:.now()+0.5) { [weak self] in
-    guard let self,self.shelfActive(),NSWorkspace.shared.frontmostApplication?.processIdentifier==app.processIdentifier else{return}
-    let focused=process(aerospace ?? "/missing/aerospace",["list-windows","--focused","--format","%{app-pid}"]).1.trimmingCharacters(in:.whitespacesAndNewlines)
-    guard focused==String(app.processIdentifier) else{return}
-    self.performShelf("shelf-add")
+  let launchID=UUID();shelfLaunchID=launchID
+  let page=currentShelfPage()
+  let previousPID=NSWorkspace.shared.frontmostApplication?.processIdentifier
+  shelfPanel.orderOut(nil);guide?.orderOut(nil);item.menu?.cancelTracking();NSApp.mainMenu?.cancelTracking()
+  DispatchQueue.main.async { [weak self] in
+   guard let self,self.shelfLaunchID==launchID,self.shelfActive(),self.currentShelfPage()==page else{return}
+   NSWorkspace.shared.openApplication(at:url,configuration:NSWorkspace.OpenConfiguration()) { [weak self] app,error in
+    guard let self,let app,error == nil else{return}
+    DispatchQueue.main.async { [weak self] in
+     guard let self else{return}
+     guard self.shelfLaunchID==launchID,self.shelfActive(),self.currentShelfPage()==page else{return}
+     self.retryShelfLaunch(bundle:bundle,app:app,launchID:launchID,page:page,previousPID:previousPID,remaining:15,sawRequestedApp:false,openedFinderHome:false)
+    }
    }
+  }
+ }
+ func retryShelfLaunch(bundle:String,app:NSRunningApplication,launchID:UUID,page:String,previousPID:pid_t?,remaining:Int,sawRequestedApp:Bool,openedFinderHome:Bool) {
+  guard shelfLaunchID==launchID,shelfActive(),currentShelfPage()==page else{return}
+  let frontPID=NSWorkspace.shared.frontmostApplication?.processIdentifier
+  let sawRequestedApp=sawRequestedApp || frontPID==app.processIdentifier
+  guard frontPID==app.processIdentifier || (!sawRequestedApp && (frontPID==previousPID || frontPID==ProcessInfo.processInfo.processIdentifier)) else{return}
+  let focused=process(aerospace ?? "/missing/aerospace",["list-windows","--focused","--format","%{app-pid}"]).1.trimmingCharacters(in:.whitespacesAndNewlines)
+  if frontPID==app.processIdentifier,focused==String(app.processIdentifier) {performShelf("shelf-add");return}
+  var openedFinderHome=openedFinderHome
+  if bundle=="com.apple.finder",remaining==10,!openedFinderHome {
+   let pids=process(aerospace ?? "/missing/aerospace",["list-windows","--all","--format","%{app-pid}"]).1.split(whereSeparator:{$0.isWhitespace})
+   if !pids.contains(where:{$0==String(app.processIdentifier)}) {openedFinderHome=true;NSWorkspace.shared.open(FileManager.default.homeDirectoryForCurrentUser)}
+  }
+  guard remaining>0 else{return}
+  DispatchQueue.main.asyncAfter(deadline:.now()+0.2) { [weak self] in
+   self?.retryShelfLaunch(bundle:bundle,app:app,launchID:launchID,page:page,previousPID:previousPID,remaining:remaining-1,sawRequestedApp:sawRequestedApp,openedFinderHome:openedFinderHome)
   }
  }
  @objc func selectWallpaper(_ sender:NSMenuItem) {
