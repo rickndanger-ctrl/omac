@@ -97,16 +97,11 @@ def _load_tile_modes():
 def _save_tile_modes(data):
  temp=STATE/'tile-modes.tmp';temp.write_text(json.dumps(data));temp.replace(_tile_mode_path())
 
-def _ax_half(pid):
- # AeroSpace has no exact half-width primitive; AX places the selected app on
- # the left half of the visible main screen without changing its process.
- script='''ObjC.import("AppKit");
-const s=$.NSScreen.mainScreen.visibleFrame;
-const p=Application("System Events").processes.whose({unixId:%d})[0];
-const w=p.windows[0];
-w.position=[s.origin.x,s.origin.y];
-w.size=[Math.floor(s.size.width/2),s.size.height];''' % pid
- run('/usr/bin/osascript','-l','JavaScript','-e',script)
+def _ax_half(window_id,app_pid):
+ # AeroSpace IDs do not identify an AX window, and app index 0 is unsafe when
+ # an app has multiple windows or spans monitors. Gate this until native code
+ # can map the exact AX element and monitor without guessing.
+ raise RuntimeError('Half mode is unavailable until the focused AeroSpace window is mapped to its AX window.')
 
 def size_window(mode):
  try: mode=Mode(mode)
@@ -120,6 +115,9 @@ def size_window(mode):
  workspace=window.get('workspace')
  if workspace not in ('1','2','3','4','5'): raise RuntimeError('Focused window is outside an Omac page.')
  key=_tile_mode_key(identity);saved=_load_tile_modes();record=saved.get(key,{})
+ original_layout=window.get('window-layout')
+ if not record and original_layout!='tiling':
+  raise RuntimeError('Size modes require a tiled window so its original slot can be restored.')
  planner=TileModePlanner(WindowSnapshot(identity,workspace,str(identity.window_id)))
  try: planner.mode=Mode(record.get('mode',Mode.SMALL.value))
  except ValueError: planner.mode=Mode.SMALL
@@ -127,15 +125,15 @@ def size_window(mode):
  if intent.action=='noop': return f'Window already {mode.value}.'
  wid=str(identity.window_id)
  if mode is Mode.SMALL:
+  if record.get('original_layout','tiling')!='tiling':
+   raise RuntimeError('Cannot restore the original tile slot safely.')
   aero('fullscreen','off','--window-id',wid)
   aero('layout','--window-id',wid,'tiling')
  elif mode is Mode.HALF:
-  aero('fullscreen','off','--window-id',wid)
-  aero('layout','--window-id',wid,'floating')
-  _ax_half(identity.app_pid)
+  _ax_half(identity.window_id,identity.app_pid)
  else:
   aero('fullscreen','on','--window-id',wid)
- saved[key]={'mode':mode.value,'workspace':workspace,'window-id':identity.window_id,'app-pid':identity.app_pid,'boot':identity.boot}
+ saved[key]={'mode':mode.value,'workspace':workspace,'window-id':identity.window_id,'app-pid':identity.app_pid,'boot':identity.boot,'original_layout':record.get('original_layout',original_layout)}
  _save_tile_modes(saved)
  aero('workspace',workspace)
  return f'Window set to {mode.value}; session preserved.'
