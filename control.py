@@ -97,11 +97,41 @@ def _load_tile_modes():
 def _save_tile_modes(data):
  temp=STATE/'tile-modes.tmp';temp.write_text(json.dumps(data));temp.replace(_tile_mode_path())
 
-def _ax_half(window_id,app_pid):
- # AeroSpace IDs do not identify an AX window, and app index 0 is unsafe when
- # an app has multiple windows or spans monitors. Gate this until native code
- # can map the exact AX element and monitor without guessing.
- raise RuntimeError('Half mode is unavailable until the focused AeroSpace window is mapped to its AX window.')
+def _native_target(identity):
+ raw=run(APP,'--window-target',str(identity.window_id),str(identity.app_pid))
+ try: data=json.loads(raw)
+ except (TypeError,ValueError) as exc: raise RuntimeError('Native window target returned invalid JSON.') from exc
+ if data.get('windowID')!=identity.window_id or data.get('pid')!=identity.app_pid:
+  raise RuntimeError('Native window target identity does not match AeroSpace.')
+ frame=data.get('frame');visible=data.get('visibleFrame')
+ if not isinstance(frame,list) or len(frame)!=4 or not isinstance(visible,list) or len(visible)!=4:
+  raise RuntimeError('Native window target did not return complete frames.')
+ try: frame=[float(value) for value in frame];visible=[float(value) for value in visible]
+ except (TypeError,ValueError) as exc: raise RuntimeError('Native window target returned nonnumeric frames.') from exc
+ return {'frame':frame,'visibleFrame':visible}
+def _same_frame(actual,wanted): return all(abs(float(a)-float(b))<2 for a,b in zip(actual,wanted))
+def _preflight_workspace(workspace):
+ try: rows=json.loads(aero('list-windows','--workspace',workspace,'--format','%{window-id} %{app-pid} %{workspace} %{window-layout}','--json'))
+ except (TypeError,ValueError) as exc: raise RuntimeError('Workspace inventory is invalid.') from exc
+ if not isinstance(rows,list) or not rows: raise RuntimeError('Workspace inventory is empty.')
+ frames={}
+ for row in rows:
+  try: identity=WindowIdentity(int(row['window-id']),int(row['app-pid']),boot_session())
+  except (KeyError,TypeError,ValueError) as exc: raise RuntimeError('Workspace inventory has an invalid window identity.') from exc
+  frames[_tile_mode_key(identity)]={'identity':identity,'target':_native_target(identity)}
+ return frames
+def _restore_previous_mode(wid,old_mode,original_layout,identity=None,original_frame=None):
+ errors=[]
+ if identity is not None and original_frame is not None:
+  try: run(APP,'--window-frame',wid,str(identity.app_pid),*(str(value) for value in original_frame))
+  except Exception as exc: errors.append(f'native frame rollback: {exc}')
+ try:
+  if old_mode is Mode.FULL: aero('fullscreen','on','--window-id',wid)
+  elif old_mode is Mode.HALF: aero('layout','--window-id',wid,'floating')
+  else:
+   aero('fullscreen','off','--window-id',wid);aero('layout','--window-id',wid,original_layout)
+ except Exception as exc: errors.append(f'AeroSpace rollback: {exc}')
+ return errors
 
 def size_window(mode):
  try: mode=Mode(mode)
@@ -121,21 +151,46 @@ def size_window(mode):
  planner=TileModePlanner(WindowSnapshot(identity,workspace,str(identity.window_id)))
  try: planner.mode=Mode(record.get('mode',Mode.SMALL.value))
  except ValueError: planner.mode=Mode.SMALL
+ old_mode=planner.mode
  intent=planner.transition(identity,mode)
  if intent.action=='noop': return f'Window already {mode.value}.'
  wid=str(identity.window_id)
- if mode is Mode.SMALL:
-  if record.get('original_layout','tiling') not in ('tiling','h_tiles','v_tiles'):
-   raise RuntimeError('Cannot restore the original tile slot safely.')
-  aero('fullscreen','off','--window-id',wid)
-  aero('layout','--window-id',wid,'tiling')
- elif mode is Mode.HALF:
-  _ax_half(identity.window_id,identity.app_pid)
- else:
-  aero('fullscreen','on','--window-id',wid)
- saved[key]={'mode':mode.value,'workspace':workspace,'window-id':identity.window_id,'app-pid':identity.app_pid,'boot':identity.boot,'original_layout':record.get('original_layout',original_layout)}
- _save_tile_modes(saved)
+ preflight=_preflight_workspace(workspace)
+ target=preflight.get(key,{}).get('target')
+ if target is None: raise RuntimeError('Focused window is absent from the workspace preflight.')
+ try: live=json.loads(aero('list-windows','--focused','--format','%{window-id} %{app-pid} %{workspace} %{window-layout}','--json'))[0]
+ except (TypeError,ValueError,IndexError) as exc: raise RuntimeError('Focused window changed during size preflight.') from exc
+ if (int(live.get('window-id',-1)),int(live.get('app-pid',-1)),live.get('workspace'))!=(identity.window_id,identity.app_pid,workspace):
+  raise RuntimeError('Focused window or page changed during size preflight.')
+ original_frame=record.get('original_frame',target['frame'])
+ if not isinstance(original_frame,list) or len(original_frame)!=4:
+  raise RuntimeError('Cannot restore without the original native frame.')
+ try:
+  if mode is Mode.SMALL:
+   if record.get('original_layout','tiling') not in ('tiling','h_tiles','v_tiles'):
+    raise RuntimeError('Cannot restore the original tile slot safely.')
+   aero('fullscreen','off','--window-id',wid)
+   run(APP,'--window-frame',wid,str(identity.app_pid),*(str(value) for value in original_frame))
+   restored=_native_target(identity)
+   if not _same_frame(restored['frame'],original_frame):
+    raise RuntimeError('Native frame did not restore to its saved bounds.')
+   aero('layout','--window-id',wid,record.get('original_layout','tiling'))
+   restored=_native_target(identity)
+   if not _same_frame(restored['frame'],original_frame):
+    raise RuntimeError('Native frame changed after tiled layout was restored.')
+  elif mode is Mode.HALF:
+   aero('fullscreen','off','--window-id',wid)
+   aero('layout','--window-id',wid,'floating')
+   run(APP,'--window-half',wid,str(identity.app_pid))
+  else:
+   aero('fullscreen','on','--window-id',wid)
+ except Exception as exc:
+  rollback_errors=_restore_previous_mode(wid,old_mode,record.get('original_layout',original_layout),identity,original_frame)
+  suffix=(' Rollback errors: '+'; '.join(rollback_errors)) if rollback_errors else ''
+  raise RuntimeError(f'Size transition failed; previous mode restoration attempted: {exc}.{suffix}') from exc
+ saved[key]={'mode':mode.value,'workspace':workspace,'window-id':identity.window_id,'app-pid':identity.app_pid,'boot':identity.boot,'original_layout':record.get('original_layout',original_layout),'original_frame':original_frame,'visible_frame':record.get('visible_frame',target['visibleFrame'])}
  aero('workspace',workspace)
+ _save_tile_modes(saved)
  return f'Window set to {mode.value}; session preserved.'
 
 def stop(restore=False):
