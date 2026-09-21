@@ -244,6 +244,10 @@ if CommandLine.arguments.contains("--apply-wallpaper") || CommandLine.arguments.
  if restoring && !failed {try? FileManager.default.removeItem(at:wallpaperBackup)}
  exit(failed ? 1:0)
 }
+if let index=CommandLine.arguments.firstIndex(of:"--shelf-action"),CommandLine.arguments.count>index+1 {
+ DistributedNotificationCenter.default().postNotificationName(NSNotification.Name("com.richard.omac.shelfAction"),object:nil,userInfo:["action":CommandLine.arguments[index+1]],deliverImmediately:true)
+ RunLoop.current.run(until:Date(timeIntervalSinceNow:0.1));exit(0)
+}
 if CommandLine.arguments.contains("--shelf-page-changed") {
  DistributedNotificationCenter.default().postNotificationName(NSNotification.Name("com.richard.omac.shelfPageChanged"),object:nil,userInfo:nil,deliverImmediately:true)
  RunLoop.current.run(until:Date(timeIntervalSinceNow:0.05))
@@ -369,6 +373,7 @@ class Delegate: NSObject,NSApplicationDelegate {
   let page=currentShelfPage();guard ["1","2","3","4","5"].contains(page) else{return}
   do {try shelf.summon(windowID:id,onWorkspace:page);shelfPage=page} catch {shelfError(error)}
  }
+ @objc func shelfAction(_ note:Notification) {if let action=note.userInfo?["action"] as? String,["shelf","shelf-add","shelf-tuck","place-left","place-right"].contains(action) {perform(action)}}
  @objc func shelfPageChanged(_ note:Notification) {
   guard shelfActive(),!shelfTransition,!shelf.entries.isEmpty else{return}
   let page=currentShelfPage()
@@ -421,6 +426,9 @@ class Delegate: NSObject,NSApplicationDelegate {
  func applicationDockMenu(_ sender:NSApplication)->NSMenu? {item.menu}
 
  func applicationDidFinishLaunching(_ note:Notification) {
+  NSApp.appearance=NSAppearance(named:.darkAqua)
+  DistributedNotificationCenter.default().addObserver(self,selector:#selector(shelfAction(_:)),name:NSNotification.Name("com.richard.omac.shelfAction"),object:nil,suspensionBehavior:.deliverImmediately)
+
   DistributedNotificationCenter.default().addObserver(self,selector:#selector(shelfPageChanged(_:)),name:NSNotification.Name("com.richard.omac.shelfPageChanged"),object:nil,suspensionBehavior:.deliverImmediately)
 
   NSWorkspace.shared.notificationCenter.addObserver(self,selector:#selector(routeShortcuts(_:)),name:NSWorkspace.didActivateApplicationNotification,object:nil)
@@ -509,7 +517,7 @@ class Delegate: NSObject,NSApplicationDelegate {
     let panel=GuidePanel(contentRect:NSRect(x:0,y:0,width:620,height:570),styleMask:[.titled,.closable,.fullSizeContentView,.nonactivatingPanel],backing:.buffered,defer:false)
     panel.title="Shortcuts";panel.titleVisibility = .hidden;panel.titlebarAppearsTransparent=true
     panel.isReleasedWhenClosed=false;panel.isOpaque=false;panel.hasShadow=true;panel.hidesOnDeactivate=false
-    panel.backgroundColor=NSColor(calibratedRed:0.08,green:0.10,blue:0.13,alpha:0.85)
+    panel.backgroundColor=NSColor(calibratedRed:21/255,green:26/255,blue:33/255,alpha:0.85)
     panel.level = .floating
     panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
     panel.appearance=NSAppearance(named:.darkAqua)

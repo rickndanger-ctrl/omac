@@ -13,11 +13,11 @@ default-root-container-orientation = 'horizontal'
 persistent-workspaces = ['1', '2', '3', '4', '5']
 [mode.main.binding]
 [mode.active.binding]
-cmd-alt-space = "exec-and-forget open -g 'agent-control-center://shelf'"
-cmd-alt-shift-space = "exec-and-forget open -g 'agent-control-center://shelf-add'"
-cmd-alt-down = "exec-and-forget open -g 'agent-control-center://shelf-tuck'"
-ctrl-alt-left = "exec-and-forget open -g 'agent-control-center://place-left'"
-ctrl-alt-right = "exec-and-forget open -g 'agent-control-center://place-right'"
+cmd-alt-space = 'exec-and-forget "/Applications/Omac.app/Contents/MacOS/AgentControlCenter" --shelf-action shelf'
+cmd-alt-shift-space = 'exec-and-forget "/Applications/Omac.app/Contents/MacOS/AgentControlCenter" --shelf-action shelf-add'
+cmd-alt-down = 'exec-and-forget "/Applications/Omac.app/Contents/MacOS/AgentControlCenter" --shelf-action shelf-tuck'
+ctrl-alt-left = 'exec-and-forget "/Applications/Omac.app/Contents/MacOS/AgentControlCenter" --shelf-action place-left'
+ctrl-alt-right = 'exec-and-forget "/Applications/Omac.app/Contents/MacOS/AgentControlCenter" --shelf-action place-right'
 cmd-1 = 'workspace 1'
 
 cmd-shift-1 = 'move-node-to-workspace 1'
