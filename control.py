@@ -41,7 +41,15 @@ def stop(restore=False):
  return 'Windows and agent sessions remain open.'
 
 def terminal_windows():
- return sorted([w for w in windows() if w.get('window-title','') in ['ACC · '+r for r in ROLES]],key=lambda w:w['window-title'])
+ result=[]
+ for w in windows():
+  if w.get('app-name')!='Ghostty': continue
+  title=w.get('window-title','')
+  for role in ROLES:
+   canonical='ACC · '+role
+   if title.endswith(canonical):
+    result.append(dict(w,**{'window-title':canonical})); break
+ return sorted(result,key=lambda w:(w['window-title'],w['window-id']))
 
 def arrange():
  tiles=terminal_windows()
