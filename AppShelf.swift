@@ -59,6 +59,9 @@ public final class AppShelf {
         try setLayout(entry.windowID, "floating")
         let frame = centeredFrame(in: target.visibleFrame, full: false, minimum: minimumSize(of: target.element))
         try setFrame(target.element, frame)
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.08))
+        try setFrame(target.element, frame)
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.15))
         try verify(id: entry.windowID, pid: entry.appPID, expected: frame)
     } catch {
         try? setFrame(target.element, target.frame)
@@ -83,14 +86,30 @@ public final class AppShelf {
     public func summon(windowID: CGWindowID, onWorkspace workspace: String) throws {
         guard let record = records[windowID] else { throw ShelfError.notShelved }
         try setMinimized(record.element, false)
-        let target = try resolve(record.entry)
-        try moveToWorkspace(windowID, workspace)
-        try setLayout(windowID, "floating")
-        let visible = NSScreen.main?.visibleFrame ?? target.visibleFrame
-        let frame = centeredFrame(in: visible, full: record.full, minimum: minimumSize(of: target.element))
-        try setFrame(target.element, frame)
-        try verify(id: record.entry.windowID, pid: record.entry.appPID, expected: frame)
-        try focus(windowID)
+        do {
+            try moveToWorkspace(windowID, workspace)
+            try verifyWorkspace(windowID, workspace)
+            try setLayout(windowID, "floating")
+            RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.08))
+            let target = try resolve(record.entry)
+            let frame = centeredFrame(in: target.visibleFrame, full: record.full, minimum: minimumSize(of: target.element))
+            try setFrame(target.element, frame)
+            RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.08))
+            try setFrame(target.element, frame)
+            RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.15))
+            try verify(id: record.entry.windowID, pid: record.entry.appPID, expected: frame)
+            try focus(windowID)
+        } catch {
+            var rollbackErrors: [String] = []
+            do { try moveToWorkspace(windowID, record.entry.initialWorkspace) } catch { rollbackErrors.append("workspace: \(error)") }
+            do {
+                let target = try resolve(record.entry)
+                try setFrame(target.element, record.entry.initialFrame)
+                try setLayout(windowID, record.initialLayout)
+            } catch { rollbackErrors.append("frame/layout: \(error)") }
+            let suffix = rollbackErrors.isEmpty ? "" : " Rollback errors: \(rollbackErrors.joined(separator: "; "))"
+            throw ShelfError.unavailable("Could not summon shelf window: \(error).\(suffix)")
+        }
     }
 
     public func toggleCenteredFull(windowID: CGWindowID) throws {
@@ -101,6 +120,9 @@ public final class AppShelf {
         let frame = centeredFrame(in: target.visibleFrame, full: record.full, minimum: minimumSize(of: target.element))
         do {
             try setFrame(target.element, frame)
+            RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.08))
+            try setFrame(target.element, frame)
+            RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.15))
             try verify(id: record.entry.windowID, pid: record.entry.appPID, expected: frame)
         } catch {
             record.full.toggle()
@@ -182,5 +204,12 @@ public final class AppShelf {
         guard let aerospace else { throw ShelfError.unavailable("AeroSpace is unavailable") }
         let result = process(aerospace, ["focus", "--window-id", String(id)])
         guard result.0 == 0 else { throw ShelfError.unavailable(result.1) }
+    }
+    private func verifyWorkspace(_ id: CGWindowID, _ workspace: String) throws {
+        guard let aerospace else { throw ShelfError.unavailable("AeroSpace is unavailable") }
+        let result = process(aerospace, ["list-windows", "--window-id", String(id), "--format", "%{workspace}"])
+        guard result.0 == 0, result.1.trimmingCharacters(in: .whitespacesAndNewlines) == workspace else {
+            throw ShelfError.unavailable("Window did not reach requested workspace")
+        }
     }
 }
