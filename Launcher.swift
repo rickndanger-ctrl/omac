@@ -59,7 +59,7 @@ class Delegate: NSObject,NSApplicationDelegate {
   NSAppleEventManager.shared().setEventHandler(self,andSelector:#selector(urlEvent(_:reply:)),forEventClass:AEEventClass(kInternetEventClass),andEventID:AEEventID(kAEGetURL))
   item=NSStatusBar.system.statusItem(withLength:NSStatusItem.variableLength); item.button?.title="▦ Control"
   let menu=NSMenu()
-  for (title,action) in [("Enter / Resume Control Center","enter"),("Pause Tiling and Shortcuts","pause"),("Exit and Restore Windows","exit"),("Shortcut Guide","guide"),("Accessibility Settings","access"),("Quit Launcher","quit")] {
+  for (title,action) in [("Open / Arrange 4 Terminals","four"),("Open / Arrange 6 Terminals","six"),("New Terminal (up to 6)","new"),("Pause Tiling and Shortcuts","pause"),("Exit and Restore Windows","exit"),("Shortcut Guide","guide"),("Accessibility Settings","access"),("Quit Launcher","quit")] {
    let m=NSMenuItem(title:title,action:#selector(selected(_:)),keyEquivalent:""); m.representedObject=action; m.target=self; menu.addItem(m)
   }
   item.menu=menu
@@ -67,7 +67,7 @@ class Delegate: NSObject,NSApplicationDelegate {
   if (try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8)) == "Active" { perform("pause") }
  }
  @objc func urlEvent(_ event:NSAppleEventDescriptor,reply:NSAppleEventDescriptor) {
-  if let text=event.paramDescriptor(forKeyword:AEKeyword(keyDirectObject))?.stringValue, let action=URL(string:text)?.host, ["exit","pause","enter"].contains(action) {perform(action)}
+  if let text=event.paramDescriptor(forKeyword:AEKeyword(keyDirectObject))?.stringValue, let action=URL(string:text)?.host, ["exit","pause","enter","four","six","new"].contains(action) {perform(action)}
  }
  @objc func selected(_ sender:NSMenuItem) { perform(sender.representedObject as! String) }
  func perform(_ action:String) {

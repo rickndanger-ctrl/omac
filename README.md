@@ -1,31 +1,13 @@
-# Agent Control Center
+# Terminal Control Center
 
-Installed app: /Applications/Agent Control Center.app
+Open Agent Control Center in Applications, then choose Open / Arrange 4 Terminals or Open / Arrange 6 Terminals in the ▦ menu. These are plain Ghostty shells; launch any agents yourself. No agent, browser, or desktop app is started automatically.
 
-Open it from Applications and use the ▦ menu-bar item. Choose Accessibility Settings first to grant Agent Control Center access, then Enter. AeroSpace separately requires Accessibility permission. These macOS grants must be made by the user.
+Guide.html lists the shortcuts. Command substitutes for Omarchy Super for directional focus, swapping, terminal launch, and fullscreen. Resizing uses AeroSpace semantics. Four windows form two columns of two, six form three columns of two. Existing fifth/sixth windows are preserved when selecting four. New Terminal adds one up to six.
 
-See Guide.html for shortcuts. No model prompts are submitted automatically. Claude, Codex, and Hermes use existing CLI defaults. Local uses the existing Local Qwen launcher, including its Full Local mode requirement.
+The source and isolated configuration live in this Git repository. Commit changes before restarting services. Menu and AeroSpace helpers run under launchd; terminal jobs use open -W to track Ghostty instances. No jobs are installed for login startup. Existing agent launch jobs and wrapper are retired.
 
-## Architecture and recovery
+Pause releases window management and shortcuts. Exit also stops the owned manager and attempts to restore pre-existing window geometry. Terminal sessions remain open. Closing terminals or rebooting does not preserve their foreground sessions.
 
-AeroSpace 0.21.3-Beta and Ghostty 1.3.1 were installed through Homebrew. Custom configuration is isolated in this repository; ~/.aerospace.toml and Ghostty defaults are not modified. Unselected windows default to floating. Research manages open ChatGPT, Claude, and Chrome windows; closing a terminal ends that terminal's foreground session.
+Rollback: run `/opt/homebrew/bin/python3 control.py rollback` from this repository. This disables Control Center without closing terminals. Dependency apps remain installed.
 
-launchd supervises the menu app and AeroSpace while explicitly enabled. Each terminal launch is tracked through a launchd job running `open -W -n`, with Ghostty owning its foreground agent process. No automatic agent restarts or prompt replay. Jobs live here rather than Library/LaunchAgents, so they do not load at login. On a launcher crash, recovery pauses tiling. On an AeroSpace crash its config starts disabled; Enter resumes it.
-
-Exit disables shortcuts and stops only the owned window manager. Geometry restoration matches PID, window index, and title; changed titles or closed windows are skipped. Original snapshot is retained through pause/resume. Session persistence across closing terminals or reboot is not included.
-
-## Rollback
-
-Choose Exit and Restore Windows, then Quit Launcher. Or run:
-
-```sh
-/opt/homebrew/bin/python3 '/Users/richardholguin/Documents/Codex/2026-09-20/is-x20/outputs/agent-control-center/control.py' rollback
-```
-
-This leaves agent terminals and existing apps running. Installed dependency applications and this repository remain available. To remove the app later, quit it before moving it to Trash. Do not uninstall Ghostty while it hosts active sessions.
-
-## Build and verification
-
-Compile Launcher.swift with swiftc, Cocoa, and ApplicationServices into the installed app executable, then ad-hoc sign its bundle. Paths are deliberately fixed to this Mac. Config/source changes must be committed before restarting helpers.
-
-Run `python3 test_controller.py` for lifecycle safeguards. See VERIFICATION.md for live acceptance status. A successful build is not proof of production readiness.
+Build Launcher.swift using swiftc with Cocoa and ApplicationServices, install its executable into /Applications/Agent Control Center.app/Contents/MacOS, then codesign the bundle. generate_config.py regenerates dedicated config and launchd plists. Run test_controller.py for lifecycle checks. See VERIFICATION.md for live testing limits.

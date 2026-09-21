@@ -8,7 +8,7 @@ STATE.mkdir(parents=True,exist_ok=True)
 DOMAIN=f'gui/{os.getuid()}'
 AERO='/opt/homebrew/bin/aerospace'
 APP='/Applications/Agent Control Center.app/Contents/MacOS/AgentControlCenter'
-ROLES=['Claude','Codex','Hermes','Local']
+ROLES=[str(i) for i in range(1,7)]
 
 def run(*args,check=True):
  p=subprocess.run([str(a) for a in args],capture_output=True,text=True,timeout=30)
@@ -40,16 +40,31 @@ def stop(restore=False):
   run(APP,'--restore',check=False)
  return 'Windows and agent sessions remain open.'
 
-def enter():
+def terminal_windows():
+ return sorted([w for w in windows() if w.get('window-title','') in ['ACC · '+r for r in ROLES]],key=lambda w:w['window-title'])
+
+def arrange():
+ tiles=terminal_windows()
+ for w in tiles:
+  wid=str(w['window-id'])
+  aero('move-node-to-workspace','--window-id',wid,'Terminals')
+  aero('layout','--window-id',wid,'tiling')
+ aero('workspace','Terminals')
+ if tiles:
+  aero('focus','--window-id',str(tiles[0]['window-id']))
+  aero('flatten-workspace-tree')
+  aero('layout','--workspace','Terminals','--root','h_tiles')
+  for i in range(1,len(tiles),2):
+   wid=str(tiles[i]['window-id'])
+   aero('join-with','--window-id',wid,'left')
+   aero('layout','--window-id',wid,'v_tiles')
+  aero('balance-sizes')
+ return len(tiles)
+
+def enter(count=4,add=False):
  existing=aero('config','--config-path',check=False)
  if existing and existing!=str(ROOT/'config/aerospace.toml'):
   raise RuntimeError('Another AeroSpace configuration is active. Exit it before entering Control Center.')
- # Check access and save geometry before any window management changes.
- if (STATE/'status').exists() and (STATE/'status').read_text()=='Active':
-  try:
-   if aero('config','--config-path')==str(ROOT/'config/aerospace.toml'):
-    aero('workspace','Agents'); return 'Already active; existing sessions reused.'
-  except Exception: pass
  run(APP,'--snapshot')
  (STATE/'aerospace.enabled').touch()
  load('aerospace')
@@ -57,42 +72,29 @@ def enter():
  try:
   ready()
   if aero('config','--config-path')!=str(ROOT/'config/aerospace.toml'):
-   raise RuntimeError('A different AeroSpace instance is running. Exit it before entering Control Center.')
-  aero('reload-config','--dry-run')
-  aero('enable','on')
+   raise RuntimeError('A different AeroSpace instance is running.')
+  aero('reload-config')
   aero('mode','active')
+  current=terminal_windows()
+  if add: count=min(6,len(current)+1)
+  present={w['window-title'] for w in current}
+  needed=max(0,count-len(current))
+  expected=set(present)
   for role in ROLES:
-   label='terminal.'+role.lower(); load(label)
-   # launchctl kickstart without -k never replaces a running terminal.
+   if not needed: break
+   title='ACC · '+role
+   if title in present: continue
+   label='terminal.'+role; load(label)
    run('launchctl','kickstart',job(label),check=False)
-  for app in ['ChatGPT','Claude','Google Chrome']: run('open','-a',app)
-  for _ in range(40):
-   ws=windows()
-   if all(any(w.get('window-title','')=='ACC · '+r for w in ws) for r in ROLES): break
+   expected.add(title); needed-=1
+  for _ in range(60):
+   if expected.issubset({w['window-title'] for w in terminal_windows()}): break
    time.sleep(.25)
-  missing=[r for r in ROLES if not any(w.get('window-title','')=='ACC · '+r for w in windows())]
-  if missing:
-   raise RuntimeError('Terminal windows did not appear: '+', '.join(missing)+'. Open Ghostty manually to resolve any first-launch prompt, then retry Enter.')
-  agents=[]
-  for w in windows():
-   title=w.get('window-title',''); app=w.get('app-name',''); wid=str(w['window-id'])
-   dest='Agents' if title.startswith('ACC · ') else 'Research' if app in ['ChatGPT','Claude','Google Chrome'] else None
-   if dest:
-    aero('move-node-to-workspace','--window-id',wid,dest)
-    aero('layout','--window-id',wid,'tiling')
-    if dest=='Agents': agents.append(wid)
-  aero('workspace','Agents')
-  # Four-column fallback remains usable; create a balanced 2x2 for the default four tiles.
-  if len(agents)==4:
-   aero('flatten-workspace-tree')
-   aero('layout','h_tiles')
-   aero('join-with','--window-id',agents[1],'left')
-   aero('layout','--window-id',agents[1],'v_tiles')
-   aero('join-with','--window-id',agents[3],'left')
-   aero('layout','--window-id',agents[3],'v_tiles')
-   aero('balance-sizes')
+  missing=expected-{w['window-title'] for w in terminal_windows()}
+  if missing: raise RuntimeError('Terminal windows did not appear: '+', '.join(sorted(missing))+'. Resolve any Ghostty first-launch prompt and retry.')
+  total=arrange()
   save_status('Active')
-  return 'Control Center active.'
+  return f'{total} plain terminal windows tiled. No agents launched.'
  except Exception:
   stop(True)
   raise
@@ -101,7 +103,7 @@ def main():
  action=sys.argv[1] if len(sys.argv)>1 else 'status'
  with (STATE/'controller.lock').open('w') as lock:
   fcntl.flock(lock,fcntl.LOCK_EX)
-  if action=='enter': print(enter())
+  if action in ('enter','four','six','new'): print(enter(6 if action=='six' else 4,add=action=='new'))
   elif action in ('pause','exit'): print(stop(action=='exit'))
   elif action=='status': print((STATE/'status').read_text() if (STATE/'status').exists() else 'Inactive')
   elif action=='rollback':

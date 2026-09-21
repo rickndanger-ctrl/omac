@@ -10,7 +10,7 @@
 	<key>KeepAlive</key>
 	<false/>
 	<key>Label</key>
-	<string>com.richard.acc.terminal.local</string>
+	<string>com.richard.acc.terminal.1</string>
 	<key>ProgramArguments</key>
 	<array>
 		<string>/usr/bin/open</string>
@@ -19,21 +19,15 @@
 		<string>-a</string>
 		<string>/Applications/Ghostty.app</string>
 		<string>--args</string>
-		<string>--title=ACC · Local</string>
-		<string>--window-save-state=never</string>
-		<string>--quit-after-last-window-closed=true</string>
+		<string>--title=ACC · 1</string>
 		<string>--working-directory=/Users/richardholguin/Documents</string>
-		<string>-e</string>
-		<string>/opt/homebrew/bin/python3</string>
-		<string>/Users/richardholguin/Documents/Codex/2026-09-20/is-x20/outputs/agent-control-center/terminal.py</string>
-		<string>Local</string>
 	</array>
 	<key>RunAtLoad</key>
 	<false/>
 	<key>StandardErrorPath</key>
-	<string>/Users/richardholguin/Library/Application Support/AgentControlCenter/terminal.local.error.log</string>
+	<string>/Users/richardholguin/Library/Application Support/AgentControlCenter/terminal.1.error.log</string>
 	<key>StandardOutPath</key>
-	<string>/Users/richardholguin/Library/Application Support/AgentControlCenter/terminal.local.log</string>
+	<string>/Users/richardholguin/Library/Application Support/AgentControlCenter/terminal.1.log</string>
 	<key>ThrottleInterval</key>
 	<integer>5</integer>
 </dict>

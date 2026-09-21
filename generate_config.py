@@ -8,23 +8,23 @@ start-at-login = false
 after-startup-command = ['enable off']
 default-root-container-layout = 'tiles'
 default-root-container-orientation = 'horizontal'
-persistent-workspaces = ['Agents', 'Research']
+persistent-workspaces = ['Terminals']
 [mode.main.binding]
 [mode.active.binding]
-cmd-left = 'focus --wrap-around dfs-prev'
-cmd-right = 'focus --wrap-around dfs-next'
-ctrl-alt-up = 'focus up'
-ctrl-alt-down = 'focus down'
-ctrl-alt-shift-left = 'move left'
-ctrl-alt-shift-right = 'move right'
-ctrl-alt-shift-up = 'move up'
-ctrl-alt-shift-down = 'move down'
-ctrl-alt-1 = 'workspace Agents'
-ctrl-alt-2 = 'workspace Research'
-ctrl-alt-minus = 'resize smart -50'
-ctrl-alt-equal = 'resize smart +50'
-ctrl-alt-f = 'fullscreen'
-ctrl-alt-space = 'layout floating tiling'
+cmd-left = 'focus left'
+cmd-right = 'focus right'
+cmd-up = 'focus up'
+cmd-down = 'focus down'
+cmd-shift-left = 'swap left'
+cmd-shift-right = 'swap right'
+cmd-shift-up = 'swap up'
+cmd-shift-down = 'swap down'
+cmd-minus = 'resize smart -50'
+cmd-equal = 'resize smart +50'
+cmd-f = 'fullscreen'
+cmd-return = "exec-and-forget open 'agent-control-center://new'"
+ctrl-alt-4 = "exec-and-forget open 'agent-control-center://four'"
+ctrl-alt-6 = "exec-and-forget open 'agent-control-center://six'"
 ctrl-alt-esc = "exec-and-forget open 'agent-control-center://exit'"
 ctrl-alt-p = "exec-and-forget open 'agent-control-center://pause'"
 [gaps]
@@ -44,6 +44,6 @@ app='/Applications/Agent Control Center.app/Contents/MacOS/AgentControlCenter'
 for name,args,keep in [
  ('menu',[app,'--managed'],{'PathState':{str(s/'menu.enabled'):True}}),
  ('aerospace',['/Applications/AeroSpace.app/Contents/MacOS/AeroSpace','--config-path',str(r/'config/aerospace.toml')],{'PathState':{str(s/'aerospace.enabled'):True}}),
- *[('terminal.'+role.lower(),['/usr/bin/open','-W','-n','-a','/Applications/Ghostty.app','--args','--title=ACC · '+role,'--window-save-state=never','--quit-after-last-window-closed=true','--working-directory='+str(Path.home()/'Documents'),'-e','/opt/homebrew/bin/python3',str(r/'terminal.py'),role],False) for role in ['Claude','Codex','Hermes','Local']]]:
+ *[('terminal.'+role.lower(),['/usr/bin/open','-W','-n','-a','/Applications/Ghostty.app','--args','--title=ACC · '+role,'--working-directory='+str(Path.home()/'Documents')],False) for role in [str(i) for i in range(1,7)]]]:
  d={'Label':'com.richard.acc.'+name,'ProgramArguments':args,'RunAtLoad':False,'KeepAlive':keep,'ThrottleInterval':5,'EnvironmentVariables':env,'StandardOutPath':str(s/(name+'.log')),'StandardErrorPath':str(s/(name+'.error.log'))}
  (r/'launchd'/f'{name}.plist').write_bytes(plistlib.dumps(d))
