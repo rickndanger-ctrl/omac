@@ -336,25 +336,25 @@ class Delegate: NSObject,NSApplicationDelegate {
   if action=="rescue" {
    guard (try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8))=="Active" else {return}
    guide?.orderOut(nil);item.menu?.cancelTracking()
-   let stack=CGWindowListCopyWindowInfo([.optionOnScreenOnly,.excludeDesktopElements],kCGNullWindowID) as? [[String:Any]] ?? []
    DispatchQueue.global().async {
-    let current=process(aerospace ?? "/missing/aerospace",["list-workspaces","--focused"]).1.trimmingCharacters(in:.whitespacesAndNewlines)
-    guard ["1","2","3","4","5"].contains(current) else {return}
-    let result=process(aerospace ?? "/missing/aerospace",["list-windows","--workspace",current,"--format","%{window-id} %{app-pid} %{window-title} %{window-layout}","--json"])
-    guard result.0==0,let data=result.1.data(using:.utf8),let rows=(try? JSONSerialization.jsonObject(with:data)) as? [[String:Any]] else {return}
-    let candidates=rows.filter { ($0["app-pid"] as? Int) != Int(ProcessInfo.processInfo.processIdentifier) && ($0["window-layout"] as? String) != "macos_native_window_of_hidden_app" }
-    var target:[String:Any]?
-    for window in stack where (window[kCGWindowLayer as String] as? Int)==0 {
-     guard let pid=window[kCGWindowOwnerPID as String] as? Int else {continue}
-     let matches=candidates.filter {($0["app-pid"] as? Int)==pid}
-     if !matches.isEmpty {
-      let title=window[kCGWindowName as String] as? String
-      target=matches.first(where: { title != nil && ($0["window-title"] as? String)==title }) ?? matches.first
-      break
+    // AeroSpace traverses tiled containers from their upper-left edge.
+    // Explicitly reactivate the application: selecting an already-focused node
+    // alone may leave keyboard input with a non-window UI surface.
+    let focused=process(aerospace ?? "/missing/aerospace",["focus","--dfs-index","0"])
+    guard focused.0==0 else {return}
+    let output=process(aerospace ?? "/missing/aerospace",["list-windows","--focused","--format","%{app-pid}"])
+    guard let pid=Int32(output.1.trimmingCharacters(in:.whitespacesAndNewlines)),pid != ProcessInfo.processInfo.processIdentifier else {return}
+    DispatchQueue.main.async {
+     guard let target=NSRunningApplication(processIdentifier:pid) else {return}
+     target.activate(options:[.activateIgnoringOtherApps])
+     let application=AXUIElementCreateApplication(pid)
+     var value:CFTypeRef?
+     if AXUIElementCopyAttributeValue(application,kAXFocusedWindowAttribute as CFString,&value) == .success,let value=value {
+      let window=unsafeBitCast(value,to:AXUIElement.self)
+      AXUIElementSetAttributeValue(window,kAXMainAttribute as CFString,kCFBooleanTrue)
+      AXUIElementPerformAction(window,kAXRaiseAction as CFString)
      }
     }
-    guard let chosen=target ?? candidates.first,let id=chosen["window-id"] as? Int else {return}
-    _=process(aerospace ?? "/missing/aerospace",["focus","--window-id",String(id)])
    }
    return
   }
