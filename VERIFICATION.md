@@ -2,6 +2,8 @@
 
 Mini 2 portable aa37223: all five four-terminal grids, native login registration, branded bar, floating guide, repeated entry, disengage preservation, menu/watcher/AeroSpace restart preservation verified live. 16 automated tests and successful/failed installer integration runs pass. Actual reboot, sleep/wake, multiple displays, physical shortcut interception and native idle screensaver activation remain unverified. Historical entries below describe earlier builds and are not current blockers where superseded.
 
+Command-Escape focus rescue was hardened and verified on both Macs. In each live test, focus started on the second of two tiled windows, rescue selected the first upper-left window, and the current Omac page did not change. Mini 2 had two active displays during this check; its test apps were returned to floating afterward. The watcher now preserves its last non-empty page checkpoint while AeroSpace temporarily reports no windows. The portable suite now has 17 passing tests. Direct typing into Ghostty after rescue still needs a hands-on check because the computer-control tool cannot operate Ghostty.
+
 # Verification
 
 - macOS: 27.0 (26A428).
