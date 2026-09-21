@@ -74,6 +74,7 @@ def enter(count=4,add=False):
   if aero('config','--config-path')!=str(ROOT/'config/aerospace.toml'):
    raise RuntimeError('A different AeroSpace instance is running.')
   aero('reload-config')
+  aero('enable','on')
   aero('mode','active')
   current=terminal_windows()
   if add: count=min(6,len(current)+1)
