@@ -86,7 +86,7 @@ def enter(count=4,add=False):
    title='ACC · '+role
    if title in present: continue
    label='terminal.'+role; load(label)
-   run('launchctl','kickstart',job(label),check=False)
+   run('launchctl','kickstart','-k',job(label),check=False)
    expected.add(title); needed-=1
   for _ in range(60):
    if expected.issubset({w['window-title'] for w in terminal_windows()}): break
