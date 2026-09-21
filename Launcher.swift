@@ -104,6 +104,8 @@ if let index = CommandLine.arguments.firstIndex(of: "--window-frame"), CommandLi
   guard let p=AXValueCreate(.cgPoint,&point),let z=AXValueCreate(.cgSize,&size),
    AXUIElementSetAttributeValue(target.element,kAXPositionAttribute as CFString,p) == .success,
    AXUIElementSetAttributeValue(target.element,kAXSizeAttribute as CFString,z) == .success else {throw NativeTargetError.geometry}
+  RunLoop.current.run(until:Date(timeIntervalSinceNow:0.08))
+  guard AXUIElementSetAttributeValue(target.element,kAXPositionAttribute as CFString,p) == .success else {throw NativeTargetError.geometry}
   RunLoop.current.run(until:Date(timeIntervalSinceNow:0.15))
   let actual=try NativeWindowTarget.resolve(id:id,pid:pid).frame
   guard abs(actual.minX-point.x)<2,abs(actual.minY-point.y)<2,abs(actual.width-size.width)<2,abs(actual.height-size.height)<2 else {throw NativeTargetError.geometry}

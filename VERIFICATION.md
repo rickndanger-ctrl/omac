@@ -108,3 +108,9 @@ Fixed actual CLI contract: default AeroSpace JSON omits PID/workspace/layout, so
 Two temporary Finder windows on Mini 1 began at [8,38,948,1033] and [964,38,948,1033]. The second window was selected by exact ID, moved to half-screen, returned to its recorded frame, and re-tiled. Both windows read back their original bounds afterward; only those temporary windows were closed. A final position application after the size change was necessary for macOS to settle the requested bounds.
 
 The same native target probe ran read-only over SSH on Mini 2 and resolved its live Chrome window to the physical display visible frame [1180,0,1920,1080], rather than assuming the primary virtual display. No Mini 2 window was resized and no installed binary changed. Half currently floats the target and does not yet reserve grid space from neighbors; the daily binding must remain gated until shared-grid behavior is implemented.
+
+### Whole-page grid prototype remains gated
+
+`grid_controller.py` is an experimental whole-page transaction, not packaged or bound. A two-Finder test on an otherwise empty page 5 failed frame verification for quarter-sized tiles; subsequent rollback verification also reported errors. Both disposable Finder windows were closed by their created IDs and page 1 restored. No user windows were part of that transaction. Do not deploy this path until app-size fallback and rollback are proven.
+
+The separate Omac Tile Lab launches and visibly states that capture starts only after choosing a window and pressing Preview. Screen Recording approval is pending; no capture started. Controller native integration now has 38 passing tests; no daily binary/bindings were replaced.
