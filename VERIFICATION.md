@@ -114,3 +114,13 @@ The same native target probe ran read-only over SSH on Mini 2 and resolved its l
 `grid_controller.py` is an experimental whole-page transaction, not packaged or bound. A two-Finder test on an otherwise empty page 5 failed frame verification for quarter-sized tiles; subsequent rollback verification also reported errors. Both disposable Finder windows were closed by their created IDs and page 1 restored. No user windows were part of that transaction. Do not deploy this path until app-size fallback and rollback are proven.
 
 The separate Omac Tile Lab launches and visibly states that capture starts only after choosing a window and pressing Preview. Screen Recording approval is pending; no capture started. Controller native integration now has 38 passing tests; no daily binary/bindings were replaced.
+
+
+## App shelf development checkpoint (2026-09-21)
+- New user direction supersedes native-app miniature previews and forced three-size behavior: one real app icon per app, reuse one existing window, preserve native sizing, tuck on page switch, recall on current page.
+- Live disposable Finder test passed enrollment, deduplication, minimization, recall on pages 2 and 3, and restoration. Same window ID throughout.
+- Atomic checkpoint reload recovered a minimized Finder window and subsequent cross-page recall passed.
+- Isolated icon selector showed real Finder/Chrome icons; Right Arrow changed focused entry and Return selected it.
+- Native source typecheck, generated TOML parsing, and 40 existing regression tests passed. Those 40 tests are not shelf UI coverage.
+- Full installed-app integration, automatic workspace-change tuck, app-launch enrollment, physical Mini 2 behavior, and left/right terminal placement remain unverified. Terminal UI testing was denied by the computer-use tool; no bypass attempted.
+- Existing installed Omac has not been replaced in this checkpoint.

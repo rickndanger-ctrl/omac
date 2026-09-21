@@ -7,12 +7,19 @@ s.mkdir(parents=True,exist_ok=True)
 config='''config-version = 2
 start-at-login = false
 after-startup-command = ['exec-and-forget /opt/homebrew/bin/python3 "CONTROLLER" recover']
+exec-on-workspace-change = ['/Applications/Omac.app/Contents/MacOS/AgentControlCenter', '--shelf-page-changed']
 default-root-container-layout = 'tiles'
 default-root-container-orientation = 'horizontal'
 persistent-workspaces = ['1', '2', '3', '4', '5']
 [mode.main.binding]
 [mode.active.binding]
+cmd-alt-space = "exec-and-forget open -g 'agent-control-center://shelf'"
+cmd-alt-shift-space = "exec-and-forget open -g 'agent-control-center://shelf-add'"
+cmd-alt-down = "exec-and-forget open -g 'agent-control-center://shelf-tuck'"
+ctrl-alt-left = "exec-and-forget open -g 'agent-control-center://place-left'"
+ctrl-alt-right = "exec-and-forget open -g 'agent-control-center://place-right'"
 cmd-1 = 'workspace 1'
+
 cmd-shift-1 = 'move-node-to-workspace 1'
 cmd-2 = 'workspace 2'
 cmd-shift-2 = 'move-node-to-workspace 2'
@@ -32,7 +39,7 @@ cmd-alt-v = 'exec-and-forget open -b com.microsoft.VSCode'
 cmd-alt-t = 'exec-and-forget open -b ru.keepcoder.Telegram'
 cmd-alt-i = 'exec-and-forget open -b com.apple.MobileSMS'
 cmd-alt-m = 'exec-and-forget open -b com.apple.mail'
- cmd-alt-s = 'exec-and-forget open -b com.apple.systempreferences'
+cmd-alt-s = 'exec-and-forget open -b com.apple.systempreferences'
 cmd-left = 'focus --ignore-floating left'
 cmd-right = 'focus --ignore-floating right'
 cmd-up = 'focus --ignore-floating up'
@@ -81,6 +88,13 @@ lines=config.splitlines()
 for i,line in enumerate(lines):
  if line.startswith('after-startup-command ='):
   lines[i]='after-startup-command = ['+json.dumps('exec-and-forget '+shlex.join([PYTHON,str(r/'control.py'),'recover']))+']'
+ elif line.startswith('exec-on-workspace-change ='):
+  lines[i]='exec-on-workspace-change = '+json.dumps([app,'--shelf-page-changed'])
+ elif line.startswith('cmd-alt-') and ('open -a ' in line or 'open -b ' in line):
+  app_bundles={'c':'com.anthropic.claudefordesktop','h':'com.nousresearch.hermes.setup','g':'com.openai.codex','b':'com.google.Chrome','e':'com.apple.finder','r':'com.todesktop.230313mzl4w4u92','v':'com.microsoft.VSCode','t':'ru.keepcoder.Telegram','i':'com.apple.MobileSMS','m':'com.apple.mail','s':'com.apple.systempreferences'}
+  key=line.split(' =')[0].strip()
+  bundle=app_bundles.get(key.removeprefix('cmd-alt-'))
+  if bundle: lines[i]=key+' = '+json.dumps("exec-and-forget open -g 'agent-control-center://launch?bundle="+bundle+"'")
  elif line.startswith('cmd-k ='):
   lines[i]='cmd-k = '+json.dumps('exec-and-forget '+shlex.join([app,'--guide']))
  elif line.startswith('cmd-alt-enter ='):

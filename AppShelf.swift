@@ -45,6 +45,7 @@ public final class AppShelf {
 
     @discardableResult
     public func addFocusedWindow() throws -> Entry {
+        pruneStaleRecords()
         guard let aerospace else { throw ShelfError.unavailable("AeroSpace is unavailable") }
         let result = process(aerospace, ["list-windows", "--focused", "--format", "%{window-id} %{app-pid} %{app-name} %{window-title} %{workspace} %{window-layout}", "--json"])
         guard result.0 == 0, let rows = (try? JSONSerialization.jsonObject(with: Data(result.1.utf8)) as? [[String: Any]]),
@@ -62,7 +63,7 @@ public final class AppShelf {
     }
     let target = try resolve(id: CGWindowID(id), pid: pid_t(pid))
     try validateStandardWindow(target.element)
-    guard let launchDate = app.launchDate else { throw ShelfError.stale }
+    guard let launchDate = processLaunchDate(app) else { throw ShelfError.stale }
     let entry = Entry(windowID: CGWindowID(id), appPID: pid_t(pid), launchDate: launchDate, bundleIdentifier: app.bundleIdentifier, appName: name,
                       windowTitle: title, icon: app.icon, initialFrame: target.frame,
                       initialWorkspace: workspace)
@@ -82,9 +83,11 @@ public final class AppShelf {
     }
 
     public func tuckAll() throws {
+        pruneStaleRecords()
         var failures: [Error] = []
         for record in records.values {
             do {
+                try validateRecord(record)
                 guard AXUIElementSetAttributeValue(record.element, kAXMinimizedAttribute as CFString, kCFBooleanTrue) == .success else { throw ShelfError.geometry }
             } catch { failures.append(error) }
         }
@@ -94,6 +97,7 @@ public final class AppShelf {
 
     public func summon(windowID: CGWindowID, onWorkspace workspace: String) throws {
         guard let record = records[windowID] else { throw ShelfError.notShelved }
+        try validateRecord(record)
         try setMinimized(record.element, false)
         RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.5))
         do {
@@ -118,6 +122,7 @@ public final class AppShelf {
 
     public func toggleCenteredFull(windowID: CGWindowID) throws {
         guard let record = records[windowID] else { throw ShelfError.notShelved }
+        try validateRecord(record)
         try setMinimized(record.element, false)
         let target = try resolve(record.entry)
         record.full.toggle()
@@ -136,6 +141,7 @@ public final class AppShelf {
     }
 
     public func releaseAll() throws {
+        pruneStaleRecords()
         var failures: [Error] = []
         for record in records.values {
             do {
@@ -160,9 +166,22 @@ public final class AppShelf {
     private func isTerminal(_ app: NSRunningApplication) -> Bool {
         ["com.mitchellh.ghostty", "com.apple.Terminal", "com.googlecode.iterm2", "com.github.wez.wezterm", "org.alacritty"].contains(app.bundleIdentifier ?? "")
     }
+    private func processLaunchDate(_ app:NSRunningApplication)->Date? {
+        var info=proc_bsdinfo()
+        let count=proc_pidinfo(app.processIdentifier,PROC_PIDTBSDINFO,0,&info,Int32(MemoryLayout<proc_bsdinfo>.size))
+        guard count==MemoryLayout<proc_bsdinfo>.size else{return nil}
+        return Date(timeIntervalSince1970:Double(info.pbi_start_tvsec)+Double(info.pbi_start_tvusec)/1_000_000)
+    }
     private func sameProcess(_ date: Date, _ app: NSRunningApplication) -> Bool {
-        guard let launch = app.launchDate else { return false }
+        guard let launch = processLaunchDate(app) else { return false }
         return abs(launch.timeIntervalSince(date)) < 0.01
+    }
+    private func validateRecord(_ record:Record) throws {
+        guard let app=NSRunningApplication(processIdentifier:record.entry.appPID),sameProcess(record.launchDate,app) else {throw ShelfError.stale}
+        let element=try resolveAXElement(id:record.entry.windowID,pid:record.entry.appPID)
+        var minimized:CFTypeRef?
+        _=AXUIElementCopyAttributeValue(element,kAXMinimizedAttribute as CFString,&minimized)
+        if (minimized as? Bool) != true {try validateStandardWindow(element)}
     }
     private func pruneStaleRecords() {
         var changed = false
@@ -170,7 +189,9 @@ public final class AppShelf {
             guard let app = NSRunningApplication(processIdentifier: record.entry.appPID) else {
                 records.removeValue(forKey: id); appRecords.removeValue(forKey: record.appKey); changed = true; continue
             }
-            if !sameProcess(record.launchDate, app) {
+            var missing=false
+            do {_ = try resolveAXElement(id:id,pid:record.entry.appPID)} catch ShelfError.stale {missing=true} catch {}
+            if !sameProcess(record.launchDate, app) || missing {
                 records.removeValue(forKey: id); appRecords.removeValue(forKey: record.appKey); changed = true
             }
         }
@@ -183,7 +204,9 @@ public final class AppShelf {
             guard item.frame.count == 4,
                   let app = NSRunningApplication(processIdentifier: item.appPID), sameProcess(item.launchDate, app), !isTerminal(app),
                   let element = try? resolveAXElement(id: item.windowID, pid: item.appPID) else { continue }
-            do { try validateStandardWindow(element) } catch { continue }
+            var minimized:CFTypeRef?
+            _=AXUIElementCopyAttributeValue(element,kAXMinimizedAttribute as CFString,&minimized)
+            if (minimized as? Bool) != true {do {try validateStandardWindow(element)} catch {continue}}
             let entry = Entry(windowID: item.windowID, appPID: item.appPID, launchDate: item.launchDate,
                               bundleIdentifier: item.bundleIdentifier, appName: item.appName,
                               windowTitle: item.windowTitle, icon: app.icon,
@@ -224,7 +247,7 @@ public final class AppShelf {
         let app = AXUIElementCreateApplication(pid); AXUIElementSetMessagingTimeout(app, 1)
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &value) == .success,
-              let windows = value as? [AXUIElement] else { throw ShelfError.stale }
+              let windows = value as? [AXUIElement] else { throw ShelfError.unavailable("App window inventory is temporarily unavailable") }
         let matches = windows.filter { window in
             var candidate: CGWindowID = 0
             return getID(window, &candidate) == .success && candidate == id

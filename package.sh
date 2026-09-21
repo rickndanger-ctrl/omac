@@ -11,7 +11,9 @@ stage="$out/staging"
 app="$stage/Omac.app"
 [[ ! -e "$app" ]] || { print -u2 'Existing staging app: move dist aside before rebuilding.'; exit 1; }
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources/Payload/config" "$app/Contents/Resources/Payload/branding/wallpapers" "$app/Contents/Resources/Extras"
-swiftc -O -target "$arch-apple-macosx14.0" Launcher.swift -o "$app/Contents/MacOS/AgentControlCenter" -framework Cocoa -framework ApplicationServices -framework WebKit -framework ServiceManagement
+cat Launcher.swift AppShelf.swift ShelfPanel.swift > "$stage/main.swift"
+swiftc -O -target "$arch-apple-macosx14.0" "$stage/main.swift" -o "$app/Contents/MacOS/AgentControlCenter" -framework Cocoa -framework ApplicationServices -framework WebKit -framework ServiceManagement
+rm "$stage/main.swift"
 cp Info.plist "$app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $version" "$app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c 'Add :CFBundleVersion string 120' "$app/Contents/Info.plist"

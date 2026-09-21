@@ -244,6 +244,11 @@ if CommandLine.arguments.contains("--apply-wallpaper") || CommandLine.arguments.
  if restoring && !failed {try? FileManager.default.removeItem(at:wallpaperBackup)}
  exit(failed ? 1:0)
 }
+if CommandLine.arguments.contains("--shelf-page-changed") {
+ DistributedNotificationCenter.default().postNotificationName(NSNotification.Name("com.richard.omac.shelfPageChanged"),object:nil,userInfo:nil,deliverImmediately:true)
+ RunLoop.current.run(until:Date(timeIntervalSinceNow:0.05))
+ exit(0)
+}
 if CommandLine.arguments.contains("--guide") {
  let current=process(aerospace ?? "/missing/aerospace",["list-workspaces","--focused"])
  let page=current.1.trimmingCharacters(in:.whitespacesAndNewlines)
@@ -334,6 +339,55 @@ class GuidePanel: NSPanel {
 }
 class Delegate: NSObject,NSApplicationDelegate {
  var item:NSStatusItem!; var busy=false; var guide:GuidePanel?
+ let shelf=AppShelf(checkpointURL:state.appendingPathComponent("app-shelf.json")); let shelfPanel=ShelfPanel()
+ var shelfItems:[NSStatusItem]=[]
+ var shelfIDs:[CGWindowID]=[]
+ var shelfPage:String?
+ var shelfTransition=false
+ func shelfActive()->Bool {(try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8)) == "Active"}
+ func currentShelfPage()->String {process(aerospace ?? "/missing/aerospace",["list-workspaces","--focused"]).1.trimmingCharacters(in:.whitespacesAndNewlines)}
+ func shelfError(_ error:Error) {let alert=NSAlert();alert.messageText="Omac app shelf";alert.informativeText=String(describing:error);alert.runModal()}
+ func refreshShelf() {
+  let entries=shelf.entries
+  let ids=entries.map{$0.windowID}
+  guard ids != shelfIDs else{return};shelfIDs=ids
+  for status in shelfItems {NSStatusBar.system.removeStatusItem(status)};shelfItems=[]
+  for entry in entries {
+   let status=NSStatusBar.system.statusItem(withLength:26)
+   status.button?.image=entry.icon?.copy() as? NSImage
+   status.button?.image?.size=NSSize(width:18,height:18)
+   status.button?.toolTip=entry.appName
+   status.button?.setAccessibilityLabel("Open " + entry.appName)
+   status.button?.tag=Int(entry.windowID);status.button?.target=self;status.button?.action=#selector(summonShelfItem(_:))
+   shelfItems.append(status)
+  }
+ }
+ @objc func summonShelfItem(_ sender:NSStatusBarButton) {summonShelf(CGWindowID(sender.tag))}
+ func summonShelf(_ id:CGWindowID) {
+  guard shelfActive(),!shelfTransition else{return}
+  shelfTransition=true;defer{shelfTransition=false}
+  let page=currentShelfPage();guard ["1","2","3","4","5"].contains(page) else{return}
+  do {try shelf.summon(windowID:id,onWorkspace:page);shelfPage=page} catch {shelfError(error)}
+ }
+ @objc func shelfPageChanged(_ note:Notification) {
+  guard shelfActive(),!shelfTransition,!shelf.entries.isEmpty else{return}
+  let page=currentShelfPage()
+  guard page != shelfPage else{return}
+  do {try shelf.tuckAll();shelfPage=page;shelfPanel.orderOut(nil)} catch {shelfError(error)}
+ }
+ func performShelf(_ action:String) {
+  guard shelfActive(),!shelfTransition else{return}
+  shelfTransition=true;defer{shelfTransition=false}
+  do {
+   if action=="shelf-add" {try shelf.addFocusedWindow();shelfPage=currentShelfPage();refreshShelf()}
+   if action=="shelf-tuck" {try shelf.tuckAll()}
+   if action=="shelf" {
+    shelfPanel.onChoose={[weak self] id in self?.summonShelf(id)}
+    shelfPanel.present(shelf.entries.map{ShelfChoice(windowID:$0.windowID,appName:$0.appName,windowTitle:$0.windowTitle,icon:$0.icon)})
+   }
+  } catch {shelfError(error)}
+ }
+
  let brandBar=OmacBrandBar(logo:root+"/branding/Omac.png")
  var barTimer:Timer?;var barRefreshing=false
  private let shortcutQueue=DispatchQueue(label:"com.richard.omac.shortcut-routing")
@@ -354,6 +408,7 @@ class Delegate: NSObject,NSApplicationDelegate {
    let status=(try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8)) ?? "Inactive"
    DispatchQueue.main.async {
     self.barRefreshing=false
+    self.refreshShelf()
     self.item.button?.title=""
     self.item.button?.image=self.brandBar.image(page:page,status:status)
     self.item.button?.toolTip="Omac · \(status) · Page \(page) · Command 1–5 to switch"
@@ -366,13 +421,15 @@ class Delegate: NSObject,NSApplicationDelegate {
  func applicationDockMenu(_ sender:NSApplication)->NSMenu? {item.menu}
 
  func applicationDidFinishLaunching(_ note:Notification) {
+  DistributedNotificationCenter.default().addObserver(self,selector:#selector(shelfPageChanged(_:)),name:NSNotification.Name("com.richard.omac.shelfPageChanged"),object:nil,suspensionBehavior:.deliverImmediately)
+
   NSWorkspace.shared.notificationCenter.addObserver(self,selector:#selector(routeShortcuts(_:)),name:NSWorkspace.didActivateApplicationNotification,object:nil)
   NSAppleEventManager.shared().setEventHandler(self,andSelector:#selector(urlEvent(_:reply:)),forEventClass:AEEventClass(kInternetEventClass),andEventID:AEEventID(kAEGetURL))
   DistributedNotificationCenter.default().addObserver(self,selector:#selector(showGuideNotification(_:)),name:NSNotification.Name("com.richard.acc.showGuide"),object:nil,suspensionBehavior:.deliverImmediately)
   item=NSStatusBar.system.statusItem(withLength:NSStatusItem.variableLength); statusTitle("▦ Omac")
   let menu=NSMenu()
   let pages=NSMenuItem(title:"Omac Pages",action:nil,keyEquivalent:"");let pageMenu=NSMenu();for n in 1...5 {let e=NSMenuItem(title:"Page \(n)    ⌘\(n)",action:#selector(selectPage(_:)),keyEquivalent:"");e.tag=n;e.target=self;pageMenu.addItem(e)};pages.submenu=pageMenu;menu.addItem(pages);menu.addItem(.separator())
-  for (title,action) in [("Engage Omac","enter"),("Open / Arrange 4 Terminals","four"),("Open / Arrange 6 Terminals","six"),("New Terminal (up to 6)","new"),("Pause Tiling and Shortcuts","pause"),("Disengage Omac — Restore Windows","exit"),("Shortcut Guide","guide"),("Accessibility Settings","access"),("Start Omac at Login","enable-login"),("Disable Login Startup","disable-login"),("Quit Omac","quit")] {
+  for (title,action) in [("Engage Omac","enter"),("Open / Arrange 4 Terminals","four"),("Open / Arrange 6 Terminals","six"),("New Terminal (up to 6)","new"),("Pause Tiling and Shortcuts","pause"),("Disengage Omac — Restore Windows","exit"),("Shortcut Guide","guide"),("Choose Shelf App    ⌘⌥Space","shelf"),("Add Current App to Shelf    ⌘⌥⇧Space","shelf-add"),("Tuck Shelf Apps Away    ⌘⌥↓","shelf-tuck"),("Accessibility Settings","access"),("Start Omac at Login","enable-login"),("Disable Login Startup","disable-login"),("Quit Omac","quit")] {
    let m=NSMenuItem(title:title,action:#selector(selected(_:)),keyEquivalent:""); m.representedObject=action; m.target=self; menu.addItem(m)
   }
   menu.addItem(.separator())
@@ -399,6 +456,7 @@ class Delegate: NSObject,NSApplicationDelegate {
   saver.representedObject="x-apple.systempreferences:com.apple.Wallpaper-Settings.extension";saver.target=self;appearanceMenu.addItem(saver)
   appearance.submenu=appearanceMenu;menu.addItem(appearance)
   item.menu=menu
+  refreshShelf();shelfPage=currentShelfPage()
   barTimer=Timer.scheduledTimer(withTimeInterval:1.5,repeats:true){[weak self] _ in self?.refreshBar()}
   let main=NSMenu();let appItem=NSMenuItem();main.addItem(appItem);appItem.submenu=menu.copy() as? NSMenu;NSApp.mainMenu=main
   DistributedNotificationCenter.default().addObserver(self,selector:#selector(engageNotification(_:)),name:NSNotification.Name("com.richard.acc.engage"),object:nil,suspensionBehavior:.deliverImmediately)
@@ -408,12 +466,26 @@ class Delegate: NSObject,NSApplicationDelegate {
   if (try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8)) == "Active" { perform("enter") }
  }
  @objc func urlEvent(_ event:NSAppleEventDescriptor,reply:NSAppleEventDescriptor) {
-  if let text=event.paramDescriptor(forKeyword:AEKeyword(keyDirectObject))?.stringValue, let action=URL(string:text)?.host, ["exit","pause","enter","four","six","new","guide","menu","center","rescue","refocus"].contains(action) {perform(action)}
+  if let text=event.paramDescriptor(forKeyword:AEKeyword(keyDirectObject))?.stringValue,let url=URLComponents(string:text),url.host=="launch",let bundle=url.queryItems?.first(where:{$0.name=="bundle"})?.value {launchShelfApp(bundle);return}
+
+  if let text=event.paramDescriptor(forKeyword:AEKeyword(keyDirectObject))?.stringValue, let action=URL(string:text)?.host, ["exit","pause","enter","four","six","new","guide","menu","center","rescue","refocus","shelf","shelf-add","shelf-tuck","place-left","place-right"].contains(action) {perform(action)}
  }
  @objc func selectPage(_ sender:NSMenuItem) { guard (try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8))=="Active" else{return};DispatchQueue.global().async {_=process(aerospace ?? "/missing/aerospace",["workspace",String(sender.tag)]);DispatchQueue.main.async{self.refreshBar()}} }
  @objc func launchApp(_ sender:NSMenuItem) {
-  guard let bundle=sender.representedObject as? String,let url=NSWorkspace.shared.urlForApplication(withBundleIdentifier:bundle) else {return}
-  NSWorkspace.shared.openApplication(at:url,configuration:NSWorkspace.OpenConfiguration())
+  if let bundle=sender.representedObject as? String {launchShelfApp(bundle)}
+ }
+ func launchShelfApp(_ bundle:String) {
+  if let entry=shelf.entries.first(where:{$0.bundleIdentifier==bundle}),shelfActive() {summonShelf(entry.windowID);return}
+  guard let url=NSWorkspace.shared.urlForApplication(withBundleIdentifier:bundle) else{return}
+  NSWorkspace.shared.openApplication(at:url,configuration:NSWorkspace.OpenConfiguration()) { [weak self] app,error in
+   guard let app,error == nil else{return}
+   DispatchQueue.main.asyncAfter(deadline:.now()+0.5) { [weak self] in
+    guard let self,self.shelfActive(),NSWorkspace.shared.frontmostApplication?.processIdentifier==app.processIdentifier else{return}
+    let focused=process(aerospace ?? "/missing/aerospace",["list-windows","--focused","--format","%{app-pid}"]).1.trimmingCharacters(in:.whitespacesAndNewlines)
+    guard focused==String(app.processIdentifier) else{return}
+    self.performShelf("shelf-add")
+   }
+  }
  }
  @objc func selectWallpaper(_ sender:NSMenuItem) {
   guard let choice=sender.representedObject as? String else {return}
@@ -451,7 +523,30 @@ class Delegate: NSObject,NSApplicationDelegate {
    panel.center();panel.makeKeyAndOrderFront(nil);panel.orderFrontRegardless()
 
  }
+ func placeFocusedWindow(_ side:String) {
+  guard shelfActive(),let aero=aerospace else{return}
+  let result=process(aero,["list-windows","--focused","--format","%{window-id} %{app-pid} %{window-layout}","--json"])
+  guard let rows=(try? JSONSerialization.jsonObject(with:Data(result.1.utf8))) as? [[String:Any]],let row=rows.first,let id=row["window-id"] as? UInt32,let pid=row["app-pid"] as? Int32,let layout=row["window-layout"] as? String else{return}
+  do {
+   let target=try NativeWindowTarget.resolve(id:id,pid:pid)
+   guard ["floating","h_tiles","v_tiles"].contains(layout) else{return}
+   let area=target.visibleFrame.insetBy(dx:8,dy:8)
+   let width=(area.width-8)/2
+   let frame=CGRect(x:side=="left" ? area.minX : area.maxX-width,y:area.minY,width:width,height:area.height)
+   guard process(aero,["layout","--window-id",String(id),"floating"]).0==0 else{return}
+   let resized=process(appExecutable,["--window-frame",String(id),String(pid)]+[frame.minX,frame.minY,frame.width,frame.height].map{String(Double($0))})
+   if resized.0 != 0 {
+    _=process(appExecutable,["--window-frame",String(id),String(pid)]+[target.frame.minX,target.frame.minY,target.frame.width,target.frame.height].map{String(Double($0))})
+    _=process(aero,["layout","--window-id",String(id),layout])
+    throw AppShelf.ShelfError.unavailable("This app did not accept the half-screen size. Its previous layout was requested again.")
+   }
+  } catch {shelfError(error)}
+ }
  func perform(_ action:String) {
+  if action=="place-left" || action=="place-right" {placeFocusedWindow(action=="place-left" ? "left":"right");return}
+
+  if ["shelf","shelf-add","shelf-tuck"].contains(action) {performShelf(action);return}
+
   if action=="rescue" || action=="refocus" {
    guard (try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8))=="Active" else {return}
    guide?.orderOut(nil);item.menu?.cancelTracking()
@@ -575,7 +670,10 @@ class Delegate: NSObject,NSApplicationDelegate {
    _=AXIsProcessTrustedWithOptions([key:true] as CFDictionary)
    NSWorkspace.shared.open(URL(string:"x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!); return
   }
-  if ["pause","exit","quit"].contains(action) {guide?.orderOut(nil)}
+  if ["pause","exit","quit"].contains(action) {
+   do {try shelf.releaseAll();refreshShelf();shelfPanel.orderOut(nil)} catch {shelfError(error);return}
+   guide?.orderOut(nil)
+  }
   guard !busy else {return}; busy=true; statusTitle("▦ Omac · Working…")
   DispatchQueue.global().async {
    let result=process(python ?? "/missing/python3",[root+"/control.py",action=="quit" ? "exit":action])
