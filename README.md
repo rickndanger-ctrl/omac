@@ -1,32 +1,42 @@
-# Terminal Control Center
+# Omac — Mac Agent Control Center
 
-Open Agent Control Center in Applications, then choose Open / Arrange 4 Terminals or Open / Arrange 6 Terminals in the ▦ menu. These are plain Ghostty shells; launch any agents yourself. No agent, browser, or desktop app is started automatically.
+An on-demand or sign-in-started Mac workspace: five persistent AeroSpace pages, Ghostty terminal grids, desktop apps, a compact native shortcut palette, and Omac appearance choices. No agent commands, paid APIs, or model choices are launched automatically.
 
-Guide.html lists the shortcuts. Command substitutes for Omarchy Super for directional focus, swapping, terminal launch, and fullscreen. Resizing uses AeroSpace semantics. Four windows form two columns of two, six form three columns of two. Existing fifth/sixth windows are preserved when selecting four. New Terminal adds one up to six.
+## Everyday controls
 
-The source and isolated configuration live in this Git repository. Commit changes before restarting services. Menu and AeroSpace helpers run under launchd; terminal jobs use open -W to track Ghostty instances. No jobs are installed for login startup. Existing agent launch jobs and wrapper are retired.
+- Command–1…5: switch pages. Command–Shift–1…5: send the focused window to a page.
+- Command–Return: add a terminal to the current page, up to six. Control–Option–4 / 6: arrange that page's terminals in a grid.
+- Command–arrows: focus a tile; Shift adds swapping. Command–O: centered floating window / return. Command–F: enlarge / restore. Command–T: float / tile. Command–B: balance sizes.
+- Command–K: compact translucent shortcut palette. Escape dismisses it.
+- Control–Option–P: pause management. Control–Option–Escape: Exit, restore saved geometry and original wallpaper where possible, and leave terminal sessions running.
+- The **▦ Omac** menu contains Apps, Settings, Omac Appearance, and login startup controls.
 
-Pause releases window management and shortcuts. Exit also stops the owned manager and attempts to restore pre-existing window geometry. Terminal sessions remain open. Closing terminals or rebooting does not preserve their foreground sessions.
+Command–Option plus G opens Codex; C Claude; H Hermes; R Cursor; V VS Code; T Telegram; I Messages; M Mail; B Chrome; E Finder; S System Settings. Existing app windows retain their page; opening an app may focus its existing window on another page. New windows tile on the current page. Apps retain their own minimum window sizes.
 
-Rollback: run `/opt/homebrew/bin/python3 control.py rollback` from this repository. This disables Control Center without closing terminals. Dependency apps remain installed.
+## Startup and recovery
 
-Build Launcher.swift using swiftc with Cocoa and ApplicationServices, install its executable into /Applications/Agent Control Center.app/Contents/MacOS, then codesign the bundle. generate_config.py regenerates dedicated config and launchd plists. Run test_controller.py for lifecycle checks. See VERIFICATION.md for live testing limits.
+Start at Login installs `~/Library/LaunchAgents/com.richard.acc.login.plist`. It starts Omac after GUI sign-in, not before authentication. It does not launch terminal agents. The signed native app owns login initialization, rather than giving a general Python interpreter device-control access.
 
-## Window controls and appearance
-Command-K opens the native shortcut panel. Command-O toggles a terminal between centered floating and tiled. Command-T also toggles floating/tiled. Command-F enlarges within the workspace; Command-Option-F toggles native macOS fullscreen. Option-Tab cycles windows and Command-B (also Command-Shift-equals) balances the Terminals workspace. New terminal instances load config/ghostty.conf (85% opacity and blur 16); running sessions retain their existing appearance until reopened. Native macOS fullscreen disables transparency. Build now also links WebKit.
+launchd supervises the menu, AeroSpace, and event watcher. The watcher listens to AeroSpace events, debounces activity, and atomically saves window/page assignments under the controller lock; it performs no paid calls or idle polling. AeroSpace's startup hook restores assignments for matching live window IDs/PIDs from the same boot. Terminal-only grids are rebuilt; arbitrary custom split trees and fullscreen state are not serialized.
 
-## Desktop shortcuts
-While Control Center is active: Command-Option-C opens Claude; H opens Hermes; G opens Codex (using its verified com.openai.codex bundle identifier); B opens Chrome; E opens Finder. Layout resets now send one batched request and preserve the focused terminal.
+Fresh reboot begins with five available pages. Shell processes cannot survive a reboot. macOS may reopen app windows, but Omac does not guess which project/page they belong to. Page restoration across a manager crash or orderly Exit uses still-running windows only. Invalid checkpoints or a different boot are ignored.
 
-## Five pages
-Command–1 through Command–5 selects that page. Command–Shift–1 through 5 moves the focused window there without following it. Pages start empty; current windows migrate once to page 1. New normal app windows tile on the current page. Existing app launch shortcuts may focus their existing window on another page. App minimum sizes cannot be overridden.
+## Appearance
 
-Enter / Resume Five Pages does not create terminals. Command–Return creates one terminal (maximum six per page, thirty managed terminals total). Four / Six arrange only the current page. Command–O centers or returns any focused window to tiling.
+Omac Appearance offers Green Glass, Silver Glass and Amber Glass wallpaper. Green is the supplied reference; matching variants were made with the built-in image-generation tool. Original desktop image URLs are saved before applying a theme; Exit attempts restoration. Dynamic wallpaper playback/scaling are not fully represented by that URL backup. See `branding/README.md`.
 
-Page membership persists while switching and pausing. Orderly Exit saves membership for still-running windows on re-entry; exact tile trees are not restored after manager termination. Abrupt manager crashes and macOS restarts are not guaranteed to restore page assignments. No terminal sessions are closed by Exit. AeroSpace pages are virtual workspaces, separate from Mission Control Spaces.
+`branding/screensaver/build/OMAC.saver` is a native ScreenSaverView plugin. `OMAC-Preview.app` previews its renderer without locking the Mac. The system screensaver must be selected in macOS Settings. It animates a sage OMAC glyph through assembly and dissolution, at 12 frames/second; Reduce Motion uses a still image. Existing lock/password requirements are not modified.
 
-Rollback for this update: git revert the five-page commit, regenerate configuration with generate_config.py, then rebuild Launcher.swift and reload the configuration. To disable all management without stopping terminal sessions, run control.py rollback.
+## Build and rollback
 
-Adding a terminal with Command–Return rebuilds the current page’s terminal grid, matching Four / Six: pairs form rows within columns. Other pages are untouched.
+Run `./build.sh`. For durable Accessibility trust, use the same installed Apple Development identity when signing the installed app; rebuilding with ad-hoc signing changes its trust identity. `OMAC_SIGN_IDENTITY` controls screensaver/preview signing in the build script. Main app installation/signing must use the same identity too. Keep this repository at its current path: installed launch jobs and app point here.
 
-The compact shortcut guide uses an 85% opaque dark background and neutral text. Command–K brings it to the current page. The menu bar now includes Apps and Settings. New Command–Option shortcuts: R Cursor, V VS Code, T Telegram, I Messages, M Mail, S System Settings. App launch shortcuts open/focus existing apps; use their New Window command to create a window on another page.
+To stop automatic startup, select **Disable Login Startup**. To disable the full setup without stopping terminal sessions:
+
+```sh
+/opt/homebrew/bin/python3 control.py rollback
+```
+
+This removes the login job, stops management/checkpointing/menu helpers, restores saved windows/wallpaper where possible, and preserves files. It does not uninstall the screensaver; choose another saver in Settings, then move `~/Library/Screen Savers/OMAC.saver` to Trash if desired.
+
+See `VERIFICATION.md` for actual evidence and remaining hardware tests. Compilation alone is not a claim of sleep/wake, reboot, or multi-display reliability.
