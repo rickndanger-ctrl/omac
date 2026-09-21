@@ -227,7 +227,18 @@ class Delegate: NSObject,NSApplicationDelegate {
  var item:NSStatusItem!; var busy=false; var guide:GuidePanel?
  let brandBar=OmacBrandBar(logo:root+"/branding/Omac.png")
  var barTimer:Timer?;var barRefreshing=false
- func statusTitle(_ text:String) { refreshBar() }
+ private let shortcutQueue=DispatchQueue(label:"com.richard.omac.shortcut-routing")
+ private var routedMode:String?
+ @objc func routeShortcuts(_ note:Notification? = nil) {
+  let remote=NSWorkspace.shared.frontmostApplication?.bundleIdentifier=="com.apple.ScreenSharing"
+  shortcutQueue.async {
+   let active=(try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8))=="Active"
+   let desired=active && !remote ? "active":"main"
+   guard self.routedMode != desired else {return}
+   if process(aerospace ?? "/missing/aerospace",["mode",desired]).0==0 {self.routedMode=desired}
+  }
+ }
+ func statusTitle(_ text:String) { refreshBar();routeShortcuts() }
  func refreshBar() {
   guard !barRefreshing else {return};barRefreshing=true
   DispatchQueue.global(qos:.utility).async {
@@ -248,6 +259,7 @@ class Delegate: NSObject,NSApplicationDelegate {
  func applicationDockMenu(_ sender:NSApplication)->NSMenu? {item.menu}
 
  func applicationDidFinishLaunching(_ note:Notification) {
+  NSWorkspace.shared.notificationCenter.addObserver(self,selector:#selector(routeShortcuts(_:)),name:NSWorkspace.didActivateApplicationNotification,object:nil)
   NSAppleEventManager.shared().setEventHandler(self,andSelector:#selector(urlEvent(_:reply:)),forEventClass:AEEventClass(kInternetEventClass),andEventID:AEEventID(kAEGetURL))
   DistributedNotificationCenter.default().addObserver(self,selector:#selector(showGuideNotification(_:)),name:NSNotification.Name("com.richard.acc.showGuide"),object:nil,suspensionBehavior:.deliverImmediately)
   item=NSStatusBar.system.statusItem(withLength:NSStatusItem.variableLength); statusTitle("▦ Omac")
