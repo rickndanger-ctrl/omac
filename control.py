@@ -1,6 +1,6 @@
 #!/opt/homebrew/bin/python3
 """On-demand controller. No API calls, credentials, or background polling."""
-import fcntl,json,os,plistlib,subprocess,sys,time
+import fcntl,json,math,os,plistlib,subprocess,sys,time
 from functools import lru_cache
 from pathlib import Path
 from portable_paths import SOURCE as ROOT, STATE, RUNTIME, AERO, APP
@@ -108,8 +108,13 @@ def _native_target(identity):
   raise RuntimeError('Native window target did not return complete frames.')
  try: frame=[float(value) for value in frame];visible=[float(value) for value in visible]
  except (TypeError,ValueError) as exc: raise RuntimeError('Native window target returned nonnumeric frames.') from exc
+ if any(not all(math.isfinite(v) for v in rect) or rect[2]<=0 or rect[3]<=0 for rect in (frame,visible)):
+  raise RuntimeError('Native window target returned invalid geometry.')
  return {'frame':frame,'visibleFrame':visible}
-def _same_frame(actual,wanted): return all(abs(float(a)-float(b))<2 for a,b in zip(actual,wanted))
+def _same_frame(actual,wanted):
+ try:
+  return len(actual)==4 and len(wanted)==4 and all(math.isfinite(float(a)) and math.isfinite(float(b)) and abs(float(a)-float(b))<2 for a,b in zip(actual,wanted))
+ except (TypeError,ValueError,OverflowError): return False
 def _preflight_workspace(workspace):
  try: rows=json.loads(aero('list-windows','--workspace',workspace,'--format','%{window-id} %{app-pid} %{workspace} %{window-layout}','--json'))
  except (TypeError,ValueError) as exc: raise RuntimeError('Workspace inventory is invalid.') from exc

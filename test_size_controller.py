@@ -26,6 +26,19 @@ class SizeControllerTests(unittest.TestCase):
         control.STATE = self.old_state
         self.tmp.cleanup()
 
+    def test_native_frames_reject_invalid_geometry(self):
+        identity = control.WindowIdentity(41, 812, "boot-a")
+        for frame in ([0, 0, 0, 400], [0, 0, -1, 400], [float("nan"), 0, 500, 400], [0, 0, float("inf"), 400]):
+            data = json.loads(self.target)
+            data["frame"] = frame
+            with self.subTest(frame=frame), patch.object(control, "run", return_value=json.dumps(data)):
+                with self.assertRaises(RuntimeError):
+                    control._native_target(identity)
+
+    def test_truncated_frame_never_counts_as_restored(self):
+        self.assertFalse(control._same_frame([], [0, 0, 500, 400]))
+        self.assertFalse(control._same_frame([0, 0], [0, 0, 500, 400]))
+
     def test_inventory_explicitly_requests_required_real_cli_fields(self):
         def actual_cli_shape(*args, **kwargs):
             if "--workspace" in args:
