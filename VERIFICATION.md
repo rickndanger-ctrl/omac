@@ -48,3 +48,13 @@ Six-terminal reset completed in 0.167 seconds with the same window IDs. Seven te
 - Apps and Settings menus are implemented; individual submenu selection and every Settings deep link still need interactive acceptance testing.
 - Ten controller tests and the AeroSpace configuration dry-run pass.
 - Not a claim of exhaustive reliability: sleep/wake, all display arrangements, every app's minimum sizes, and abrupt manager crash recovery remain unverified.
+
+## Daily-use hardening and Omac branding — 2026-09-21
+- Build, 14 controller/hardening tests, plist validation and configuration dry-run pass.
+- Added event-driven launchd-supervised page checkpoint watcher and an AeroSpace startup recovery hook. Cold-boot identity checks reject stale window IDs/PIDs; corrupt checkpoint tests pass. Live forced-crash testing remains pending.
+- Added RunAtLoad GUI-login initialization. First live startup FAILED with Device Control permission under launchd. Reworked startup to enter through the native app and signed it with the user's existing Apple Development identity; signature validation passes. An existing ad-hoc TCC record remained stale despite toggling. Native re-registration is awaiting the macOS unlock prompt. Latest observed login exit code was 2; login startup is configured but NOT yet proven successful.
+- Three current wallpaper choices saved: supplied Green Glass plus generated matching Silver and Amber variants. Settings visibly reported omac-obsidian as the selected desktop image. Earlier design directions retained in branding/wallpapers/archive.
+- Native OMAC.saver compiled and its principal class loaded successfully through Bundle.load. Fixed explicit Objective-C principal-class naming. Plugin installed in ~/Library/Screen Savers and appears under Other in macOS Wallpaper > Screen Saver.
+- Preview rendered original sage ASCII OMAC animation; preview dismissed. Plugin selection and idle activation are NOT yet confirmed; Settings still showed Start Screen Saver: Never. No password/lock policy was changed.
+- macOS 27.0 build 26A428; one physical C27F390 display available. Actual reboot, sleep/wake, and alternate display configurations remain unverified.
+- Management paused at the permission checkpoint; terminal sessions preserved. User approved a 45% usage ceiling; latest meter check was 43%.
