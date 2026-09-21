@@ -13,7 +13,7 @@ persistent-workspaces = ['Terminals']
 [mode.active.binding]
 cmd-alt-c = 'exec-and-forget open -a "Claude"'
 cmd-alt-h = 'exec-and-forget open -a "Hermes"'
-cmd-alt-g = 'exec-and-forget open -a "ChatGPT"'
+cmd-alt-g = 'exec-and-forget open -a "ChatGPT Classic"'
 cmd-alt-b = 'exec-and-forget open -a "Google Chrome"'
 cmd-alt-e = 'exec-and-forget open -a "Finder"'
 cmd-left = 'focus --ignore-floating left'
