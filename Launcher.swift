@@ -345,13 +345,15 @@ class Delegate: NSObject,NSApplicationDelegate {
  var item:NSStatusItem!; var busy=false; var guide:GuidePanel?
  let shelf=AppShelf(checkpointURL:state.appendingPathComponent("app-shelf.json")); let shelfPanel=ShelfPanel()
  var shelfItems:[NSStatusItem]=[]
+ let menuPanel=OmacMenuPanel()
+ var menuModel:NSMenu?
  var shelfIDs:[CGWindowID]=[]
  var shelfPage:String?
  var shelfTransition=false
  var shelfLaunchID=UUID()
  func shelfActive()->Bool {(try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8)) == "Active"}
  func currentShelfPage()->String {process(aerospace ?? "/missing/aerospace",["list-workspaces","--focused"]).1.trimmingCharacters(in:.whitespacesAndNewlines)}
- func shelfError(_ error:Error) {let alert=NSAlert();alert.messageText="Omac app shelf";alert.informativeText=String(describing:error);alert.runModal()}
+ func shelfError(_ error:Error) {fputs("Omac shelf error: \(String(describing:error))\n",stderr);let alert=NSAlert();alert.messageText="Omac app shelf";alert.informativeText=String(describing:error);alert.runModal()}
  func refreshShelf() {
   let entries=shelf.entries
   let ids=entries.map{$0.windowID}
@@ -379,7 +381,7 @@ class Delegate: NSObject,NSApplicationDelegate {
   guard shelfActive(),!shelfTransition else{return}
   let page=currentShelfPage()
   guard page != shelfPage else{return}
-  do {try shelf.tuckAll();shelfPage=page;shelfPanel.orderOut(nil)} catch {shelfError(error)}
+  do {try shelf.tuckAll();shelfPage=page;shelfPanel.orderOut(nil);menuPanel.dismiss()} catch {shelfError(error)}
  }
  func performShelf(_ action:String) {
   guard shelfActive(),!shelfTransition else{return}
@@ -424,7 +426,7 @@ class Delegate: NSObject,NSApplicationDelegate {
  }
  @objc func engageNotification(_ note:Notification) {try? FileManager.default.removeItem(at:state.appendingPathComponent("engage.request"));perform("enter")}
  func applicationShouldHandleReopen(_ sender:NSApplication,hasVisibleWindows flag:Bool)->Bool {perform("enter");return true}
- func applicationDockMenu(_ sender:NSApplication)->NSMenu? {item.menu}
+ func applicationDockMenu(_ sender:NSApplication)->NSMenu? {menuModel}
 
  func applicationDidFinishLaunching(_ note:Notification) {
   NSApp.appearance=NSAppearance(named:.darkAqua)
@@ -463,7 +465,8 @@ class Delegate: NSObject,NSApplicationDelegate {
   let saver=NSMenuItem(title:"Wallpaper & Screen Saver…",action:#selector(openSettings(_:)),keyEquivalent:"")
   saver.representedObject="x-apple.systempreferences:com.apple.Wallpaper-Settings.extension";saver.target=self;appearanceMenu.addItem(saver)
   appearance.submenu=appearanceMenu;menu.addItem(appearance)
-  item.menu=menu
+  menuModel=menu
+  item.button?.target=self;item.button?.action=#selector(showThemedMenu(_:))
   refreshShelf();shelfPage=currentShelfPage()
   barTimer=Timer.scheduledTimer(withTimeInterval:1.5,repeats:true){[weak self] _ in self?.refreshBar()}
   let main=NSMenu();let appItem=NSMenuItem();main.addItem(appItem);appItem.submenu=menu.copy() as? NSMenu;NSApp.mainMenu=main
@@ -479,16 +482,25 @@ class Delegate: NSObject,NSApplicationDelegate {
   if let text=event.paramDescriptor(forKeyword:AEKeyword(keyDirectObject))?.stringValue, let action=URL(string:text)?.host, ["exit","pause","enter","four","six","new","guide","menu","center","rescue","refocus","shelf","shelf-add","shelf-tuck","place-left","place-right"].contains(action) {perform(action)}
  }
  @objc func selectPage(_ sender:NSMenuItem) { guard (try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8))=="Active" else{return};DispatchQueue.global().async {_=process(aerospace ?? "/missing/aerospace",["workspace",String(sender.tag)]);DispatchQueue.main.async{self.refreshBar()}} }
+ @objc func showThemedMenu(_ sender:Any?) {
+  if menuPanel.isVisible {menuPanel.dismiss();return}
+  guide?.orderOut(nil);shelfPanel.orderOut(nil)
+  if let menu=menuModel {menuPanel.present(menu:menu,anchor:item.button?.window?.frame)}
+ }
  @objc func launchApp(_ sender:NSMenuItem) {
   if let bundle=sender.representedObject as? String {launchShelfApp(bundle)}
  }
  func launchShelfApp(_ bundle:String) {
+  // Finder remains a normal launcher while shelf support is deferred.
+  if bundle=="com.apple.finder",let url=NSWorkspace.shared.urlForApplication(withBundleIdentifier:bundle) {
+   shelfPanel.orderOut(nil);menuPanel.dismiss();NSWorkspace.shared.openApplication(at:url,configuration:NSWorkspace.OpenConfiguration(),completionHandler:nil);return
+  }
   if let entry=shelf.entries.first(where:{$0.bundleIdentifier==bundle}),shelfActive() {summonShelf(entry.windowID);return}
   guard let url=NSWorkspace.shared.urlForApplication(withBundleIdentifier:bundle) else{return}
   let launchID=UUID();shelfLaunchID=launchID
   let page=currentShelfPage()
   let previousPID=NSWorkspace.shared.frontmostApplication?.processIdentifier
-  shelfPanel.orderOut(nil);guide?.orderOut(nil);item.menu?.cancelTracking();NSApp.mainMenu?.cancelTracking()
+  shelfPanel.orderOut(nil);guide?.orderOut(nil);menuPanel.dismiss();menuModel?.cancelTracking();NSApp.mainMenu?.cancelTracking()
   DispatchQueue.main.async { [weak self] in
    guard let self,self.shelfLaunchID==launchID,self.shelfActive(),self.currentShelfPage()==page else{return}
    NSWorkspace.shared.openApplication(at:url,configuration:NSWorkspace.OpenConfiguration()) { [weak self] app,error in
@@ -580,7 +592,7 @@ class Delegate: NSObject,NSApplicationDelegate {
 
   if action=="rescue" || action=="refocus" {
    guard (try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8))=="Active" else {return}
-   guide?.orderOut(nil);item.menu?.cancelTracking()
+   guide?.orderOut(nil);menuPanel.dismiss();menuModel?.cancelTracking()
    DispatchQueue.global().async {
     let aero=aerospace ?? "/missing/aerospace"
     let current=process(aero,["list-workspaces","--focused"]).1.trimmingCharacters(in:.whitespacesAndNewlines)
@@ -661,31 +673,8 @@ class Delegate: NSObject,NSApplicationDelegate {
   }
 
   if action=="menu" {
-   guide?.orderOut(nil)
-   guard let menu=item.menu else {return}
-   let screen=NSScreen.screens.first(where:{$0.frame.contains(NSEvent.mouseLocation)}) ?? NSScreen.main
-   let frame=screen?.visibleFrame ?? NSRect(x:0,y:0,width:1000,height:700)
-   menu.popUp(positioning:menu.items.first,at:NSPoint(x:frame.midX-140,y:frame.midY+160),in:nil)
-   return
-  }
-
-  if action=="setup" {
-   let alert=NSAlert();alert.messageText="Omac setup"
-   alert.informativeText="Dependencies: "+(missingDependencies().isEmpty ? "Ready" : missingDependencies().joined(separator:", "))+"\nWindow control: "+(AXIsProcessTrusted() ? "Authorized":"Permission needed")+"\nStart at Login: "+(SMAppService.mainApp.status == .enabled ? "On":"Off or awaiting approval")
-   alert.runModal();return
-  }
-  if action=="enable-login" || action=="disable-login" {
-   guard Bundle.main.bundleURL.path=="/Applications/Omac.app" else {
-    let alert=NSAlert();alert.messageText="Move Omac to Applications first";alert.informativeText="Login startup must use the installed copy, not a disk image or build folder.";alert.runModal();return
-   }
-   do {
-    if action=="enable-login" {try SMAppService.mainApp.register()} else {try SMAppService.mainApp.unregister()}
-    // Remove the old login-only job after successful registration. Other services remain supervised.
-    if action=="disable-login" || SMAppService.mainApp.status == .enabled {
-     DispatchQueue.global().async {_=process(python ?? "/missing/python3",[root+"/control.py","disable-login"])}
-    }
-    if SMAppService.mainApp.status == .requiresApproval {SMAppService.openSystemSettingsLoginItems()}
-   } catch {let alert=NSAlert();alert.messageText="Could not update Omac login startup";alert.informativeText=error.localizedDescription;alert.runModal()}
+   guide?.orderOut(nil);shelfPanel.orderOut(nil)
+   if let menu=menuModel {menuPanel.present(menu:menu)}
    return
   }
   if action=="guide" {
