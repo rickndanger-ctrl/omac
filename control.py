@@ -44,7 +44,7 @@ def restore_pages():
   target=w.get('workspace')
   if target not in ('1','2','3','4','5'): continue
   commands.append(f"move-node-to-workspace --window-id {w['window-id']} {target}")
-  layout='floating' if w.get('window-layout')=='floating' else 'tiling'
+  layout='floating' if w.get('window-layout')=='floating' else 'h_tiles'
   commands.append(f"layout --window-id {w['window-id']} {layout}")
  if commands: aero('eval','; '.join(commands))
  aero('workspace',data.get('page','1'))
