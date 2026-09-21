@@ -130,7 +130,7 @@ class Delegate: NSObject,NSApplicationDelegate {
  func showGuide(page:String?) {
    guide?.close();guide=nil
    if guide==nil {
-    let panel=GuidePanel(contentRect:NSRect(x:0,y:0,width:620,height:570),styleMask:[.titled,.closable,.fullSizeContentView],backing:.buffered,defer:false)
+    let panel=GuidePanel(contentRect:NSRect(x:0,y:0,width:620,height:570),styleMask:[.titled,.closable,.fullSizeContentView,.nonactivatingPanel],backing:.buffered,defer:false)
     panel.title="Shortcuts";panel.titleVisibility = .hidden;panel.titlebarAppearsTransparent=true
     panel.isReleasedWhenClosed=false;panel.isOpaque=false;panel.hasShadow=true;panel.hidesOnDeactivate=false
     panel.backgroundColor=NSColor(calibratedRed:0.08,green:0.10,blue:0.13,alpha:0.85)
@@ -141,16 +141,9 @@ class Delegate: NSObject,NSApplicationDelegate {
     panel.contentView=web;guide=panel
    }
    guard let panel=guide else {return}
-   panel.center();panel.makeKeyAndOrderFront(nil);NSApp.activate(ignoringOtherApps:true)
-   let windowID=String(panel.windowNumber)
-   DispatchQueue.global().asyncAfter(deadline:.now()+0.2) {
-    guard let page=page else {return}
-    let result=process("/opt/homebrew/bin/aerospace",["move-node-to-workspace","--window-id",windowID,page])
-    if result.0==0 {
-     _=process("/opt/homebrew/bin/aerospace",["layout","--window-id",windowID,"floating"])
-     _=process("/opt/homebrew/bin/aerospace",["focus","--window-id",windowID])
-    } else {NSLog("Guide move failed: %@",result.1)}
-   }
+   // A nonactivating palette accepts keys without focusing the app's old workspace.
+   panel.center();panel.makeKeyAndOrderFront(nil)
+
  }
  func perform(_ action:String) {
   if action=="guide" {
