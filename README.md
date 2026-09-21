@@ -16,7 +16,7 @@ Build Launcher.swift using swiftc with Cocoa and ApplicationServices, install it
 Command-K opens the native shortcut panel. Command-O toggles a terminal between centered floating and tiled. Command-T also toggles floating/tiled. Command-F enlarges within the workspace; Command-Option-F toggles native macOS fullscreen. Option-Tab cycles windows and Command-B (also Command-Shift-equals) balances the Terminals workspace. New terminal instances load config/ghostty.conf (85% opacity and blur 16); running sessions retain their existing appearance until reopened. Native macOS fullscreen disables transparency. Build now also links WebKit.
 
 ## Desktop shortcuts
-While Control Center is active: Command-Option-C opens Claude; H opens Hermes; G opens ChatGPT desktop (installed here as ChatGPT Classic); B opens Chrome; E opens Finder. Layout resets now send one batched request and preserve the focused terminal.
+While Control Center is active: Command-Option-C opens Claude; H opens Hermes; G opens Codex (using its verified com.openai.codex bundle identifier); B opens Chrome; E opens Finder. Layout resets now send one batched request and preserve the focused terminal.
 
 ## Five pages
 Command–1 through Command–5 selects that page. Command–Shift–1 through 5 moves the focused window there without following it. Pages start empty; current windows migrate once to page 1. New normal app windows tile on the current page. Existing app launch shortcuts may focus their existing window on another page. App minimum sizes cannot be overridden.
