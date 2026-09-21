@@ -342,34 +342,48 @@ class Delegate: NSObject,NSApplicationDelegate {
     guard ["1","2","3","4","5"].contains(current) else {return}
     _=process(aero,["focus","--dfs-index","0"])
     let output=process(aero,["list-windows","--focused","--format","%{window-id} %{app-pid} %{window-layout}"])
-    let fields=output.1.split(separator:" ").map(String.init)
+    var fields=output.1.split(whereSeparator:{$0.isWhitespace}).map(String.init)
     let excludedLayouts=["floating","macos_native_window_of_hidden_app","macos_fullscreen"]
+    if fields.count >= 3 && excludedLayouts.contains(fields[2]) {
+     let inventory=process(aero,["list-windows","--workspace",current,"--json"])
+     if let data=inventory.1.data(using:.utf8),let rows=(try? JSONSerialization.jsonObject(with:data)) as? [[String:Any]],rows.count>1 {
+      for index in 1..<rows.count {
+       _=process(aero,["focus","--dfs-index",String(index)])
+       let next=process(aero,["list-windows","--focused","--format","%{window-id} %{app-pid} %{window-layout}"])
+       fields=next.1.split(whereSeparator:{$0.isWhitespace}).map(String.init)
+       if fields.count>=3 && !excludedLayouts.contains(fields[2]) {break}
+      }
+     }
+    }
     var chosenID=(fields.count >= 3 && !excludedLayouts.contains(fields[2])) ? Int(fields[0]) : nil
     var chosenPID=(fields.count >= 3 && !excludedLayouts.contains(fields[2])) ? Int32(fields[1]) : nil
     var chosenWindow:AXUIElement?
 
-    // A minimized window disappears from AeroSpace's inventory. Fall back to
-    // the last non-empty page map, find that page's upper-left AX window, and
-    // unminimize it. This avoids needing a trackpad after Show Desktop or a
-    // display reconnect.
+    // Recover only a confirmed minimized window from this boot and the same
+    // app instance. A stale process ID must never activate an unrelated app.
     if chosenPID == nil,
        let data=try? Data(contentsOf:state.appendingPathComponent("pages.json")),
        let saved=(try? JSONSerialization.jsonObject(with:data)) as? [String:Any],
+       saved["boot"] as? String == process("/usr/sbin/sysctl",["-n","kern.boottime"]).1.trimmingCharacters(in:.whitespacesAndNewlines),
+       let modified=(try? FileManager.default.attributesOfItem(atPath:state.appendingPathComponent("pages.json").path)[.modificationDate]) as? Date,
        let rows=saved["windows"] as? [[String:Any]] {
      var candidates:[(CGFloat,CGFloat,Int32,AXUIElement)]=[]
      for row in rows where (row["workspace"] as? String)==current {
       if excludedLayouts.contains(row["window-layout"] as? String ?? "") {continue}
       guard let rawPID=row["app-pid"] as? Int,rawPID != Int(ProcessInfo.processInfo.processIdentifier) else {continue}
-      let pid=Int32(rawPID),wanted=row["window-title"] as? String
+      guard let pid=Int32(exactly:rawPID),let app=NSRunningApplication(processIdentifier:pid),
+            let launched=app.launchDate,launched<=modified,
+            app.localizedName == row["app-name"] as? String,
+            let wanted=row["window-title"] as? String,!wanted.isEmpty else {continue}
       let application=AXUIElementCreateApplication(pid);var listValue:CFTypeRef?
+      AXUIElementSetMessagingTimeout(application,0.5)
       guard AXUIElementCopyAttributeValue(application,kAXWindowsAttribute as CFString,&listValue) == .success,
             let list=listValue as? [AXUIElement] else {continue}
       for window in list {
-       if let wanted=wanted,!wanted.isEmpty {
-        var titleValue:CFTypeRef?
-        _=AXUIElementCopyAttributeValue(window,kAXTitleAttribute as CFString,&titleValue)
-        guard (titleValue as? String)==wanted else {continue}
-       }
+       var titleValue:CFTypeRef?,minimizedValue:CFTypeRef?
+       _=AXUIElementCopyAttributeValue(window,kAXTitleAttribute as CFString,&titleValue)
+       _=AXUIElementCopyAttributeValue(window,kAXMinimizedAttribute as CFString,&minimizedValue)
+       guard (titleValue as? String)==wanted,(minimizedValue as? Bool)==true else {continue}
        var point=CGPoint.zero,positionValue:CFTypeRef?
        if AXUIElementCopyAttributeValue(window,kAXPositionAttribute as CFString,&positionValue) == .success,
           let positionValue=positionValue,CFGetTypeID(positionValue)==AXValueGetTypeID() {

@@ -42,7 +42,7 @@ def save_pages():
  if not current and path.exists():
   try:
    previous=json.loads(path.read_text())
-   if isinstance(previous,dict) and previous.get('windows'): return False
+   if isinstance(previous,dict) and previous.get('boot')==boot_session() and previous.get('windows'): return False
   except (ValueError,OSError): pass
  data={'boot':boot_session(),'page':page(),'windows':current}
  temp=STATE/'pages.tmp';temp.write_text(json.dumps(data));temp.replace(path)
