@@ -58,3 +58,10 @@ Six-terminal reset completed in 0.167 seconds with the same window IDs. Seven te
 - Preview rendered original sage ASCII OMAC animation; preview dismissed. Plugin selection and idle activation are NOT yet confirmed; Settings still showed Start Screen Saver: Never. No password/lock policy was changed.
 - macOS 27.0 build 26A428; one physical C27F390 display available. Actual reboot, sleep/wake, and alternate display configurations remain unverified.
 - Management paused at the permission checkpoint; terminal sessions preserved. User approved a 45% usage ceiling; latest meter check was 43%.
+
+## Omac branding and recovery — September 21
+- Signed Omac.app installed with supplied logo; persistent Dock entry configured, green status title and Engage/Disengage controls added. Internal identity retained.
+- Stale Accessibility registration resolved by resetting only this bundle's Accessibility entry and re-adding the signed app in Settings. Actual launchd login job exited 0 and reached Active.
+- Live restart tests for menu, watcher, and AeroSpace preserved all 23 window ID/PID pairs and their workspace memberships; focus remained page 1.
+- Native screensaver preview rendered; installed saver is listed in System Settings. Idle activation and native selection are not yet confirmed.
+- Actual reboot, sleep/wake and alternate physical display configurations remain untested.
