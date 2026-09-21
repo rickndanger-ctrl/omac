@@ -18,6 +18,8 @@ public final class OmacPreviewTileController: NSObject, NSWindowDelegate, SCStre
     public var onFailure: ((Error) -> Void)?
 
     private var stream: SCStream?
+    private let frameQueue = DispatchQueue(label: "com.richard.omac.preview.frames", qos: .userInitiated)
+    private let pendingFrame = DispatchSemaphore(value: 1)
     private let imageView = PreviewImageView()
     private let context = CIContext(options: [.cacheIntermediates: false])
     private var previewWindow: NSWindow?
@@ -52,7 +54,7 @@ public final class OmacPreviewTileController: NSObject, NSWindowDelegate, SCStre
             configuration.minimumFrameInterval = CMTime(value: 1, timescale: 30)
 
             let capture = SCStream(filter: filter, configuration: configuration, delegate: self)
-            try capture.addStreamOutput(self, type: .screen, sampleHandlerQueue: .global(qos: .userInitiated))
+            try capture.addStreamOutput(self, type: .screen, sampleHandlerQueue: frameQueue)
             try await capture.startCapture()
             stream = capture
             await MainActor.run { self.showWindowIfNeeded() }
@@ -67,9 +69,16 @@ public final class OmacPreviewTileController: NSObject, NSWindowDelegate, SCStre
     }
 
     public func stop() {
-        guard let capture = stream else { return }
+        let capture = stream
         stream = nil
-        Task { try? await capture.stopCapture() }
+        if let capture { Task { try? await capture.stopCapture() } }
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.previewWindow?.delegate = nil
+            self.previewWindow?.close()
+            self.previewWindow = nil
+            self.imageView.layer?.contents = nil
+        }
     }
 
     public func windowWillClose(_ notification: Notification) {
@@ -80,9 +89,15 @@ public final class OmacPreviewTileController: NSObject, NSWindowDelegate, SCStre
     public func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer,
                        of type: SCStreamOutputType) {
         guard type == .screen, let pixelBuffer = sampleBuffer.imageBuffer else { return }
+        guard pendingFrame.wait(timeout: .now()) == .success else { return }
         let image = CIImage(cvPixelBuffer: pixelBuffer)
-        guard let cgImage = context.createCGImage(image, from: image.extent) else { return }
-        DispatchQueue.main.async { [weak self] in self?.imageView.layer?.contents = cgImage }
+        guard let cgImage = context.createCGImage(image, from: image.extent) else { pendingFrame.signal(); return }
+        let gate = pendingFrame
+        DispatchQueue.main.async { [weak self] in
+            defer { gate.signal() }
+            guard let self, self.stream != nil else { return }
+            self.imageView.layer?.contents = cgImage
+        }
     }
 
     public func stream(_ stream: SCStream, didStopWithError error: Error) {
