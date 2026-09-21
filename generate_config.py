@@ -35,6 +35,7 @@ outer.right = 8
 outer.top = 8
 outer.bottom = 8
 [[on-window-detected]]
+if = 'true'
 run = 'layout floating'
 '''
 (r/'config/aerospace.toml').write_text(config)
