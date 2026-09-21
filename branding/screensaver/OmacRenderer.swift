@@ -1,6 +1,6 @@
 import AppKit
 
-/// Four restrained scenes rendered locally; no network or API calls.
+/// Four cinematic scenes rendered locally; no network or API calls.
 final class OmacRendererView: NSView {
     private var timer: Timer?
     private var phase: Double
@@ -44,24 +44,25 @@ final class OmacRendererView: NSView {
     }
 
     private func makeWordmark() {
-        // Sample a real letter silhouette into fine micro-strokes. Preserve counters,
-        // curved edges and spacing instead of enlarging a ten-row block alphabet.
-        let font = NSFont(name: "AvenirNext-DemiBold", size: 120) ?? .systemFont(ofSize: 120, weight: .semibold)
-        let text = NSAttributedString(string: "OMAC", attributes: [.font:font,.foregroundColor:NSColor.white,.kern:12])
-        let size = text.size(); maskSize = size
-        let image = NSImage(size:size)
-        image.lockFocus(); NSColor.clear.setFill(); NSRect(origin:.zero,size:size).fill()
-        text.draw(at:.zero); image.unlockFocus()
-        guard let data=image.tiffRepresentation,let bitmap=NSBitmapImageRep(data:data) else {return}
-        let sx=CGFloat(bitmap.pixelsWide)/size.width, sy=CGFloat(bitmap.pixelsHigh)/size.height
-        for y in stride(from:0,to:Int(size.height),by:2) {
-            for x in stride(from:0,to:Int(size.width),by:2) {
-                if let color=bitmap.colorAt(x:min(bitmap.pixelsWide-1,Int(CGFloat(x)*sx)),y:min(bitmap.pixelsHigh-1,Int(CGFloat(y)*sy))),color.alphaComponent > 0.55 {
-                    cells.append(CGPoint(x:x,y:y))
+        // Use the supplied logo's actual letter silhouettes as the particle map.
+        // The original asset stays untouched; sample only its OMAC wordmark region.
+        guard let image=emblem,let data=image.tiffRepresentation,
+              let bitmap=NSBitmapImageRep(data:data) else { return }
+        let left=Int(Double(bitmap.pixelsWide)*0.239)
+        let top=Int(Double(bitmap.pixelsHigh)*0.608)
+        let right=Int(Double(bitmap.pixelsWide)*0.760)
+        let bottom=Int(Double(bitmap.pixelsHigh)*0.752)
+        maskSize=CGSize(width:right-left,height:bottom-top)
+        for y in stride(from:top,to:bottom,by:2) {
+            for x in stride(from:left,to:right,by:2) {
+                guard let color=bitmap.colorAt(x:x,y:y)?.usingColorSpace(.deviceRGB) else {continue}
+                if color.greenComponent > 0.48 && color.greenComponent > color.blueComponent*1.2 {
+                    cells.append(CGPoint(x:x-left,y:y-top))
                 }
             }
         }
     }
+
     override func draw(_ rect: NSRect) {
         guard let ctx=NSGraphicsContext.current?.cgContext else {return}
         NSColor(calibratedRed:0.008,green:0.014,blue:0.019,alpha:1).setFill(); bounds.fill()
@@ -81,43 +82,52 @@ final class OmacRendererView: NSView {
         for (i,cell) in cells.enumerated() {
             let x=origin.x+cell.x*scale, y=origin.y+cell.y*scale
             let highlight=max(0,1-abs(x-beam)/max(1,width*0.045))
-            let brightness=scene == 2 ? 0.36+0.64*highlight : 0.63+0.37*highlight
+            let brightness=scene == 2 ? 0.68+0.32*highlight : 0.78+0.22*highlight
             let c=accent.blended(withFraction:highlight*0.85,of:.white) ?? accent
             c.withAlphaComponent(fade*brightness).setFill()
-            let drift=scene == 0 ? pow(abs(t-0.5)*2,5)*sin(Double(i)*1.7)*18 : 0
+            let drift=scene == 0 ? pow(abs(t-0.5)*2,5)*sin(Double(i)*1.7)*72 : 0
             // Tiny horizontal facets form crisp, finely detailed letter edges.
             NSRect(x:x+drift,y:y,width:max(0.65,scale*1.7),height:max(0.55,scale*1.2)).fill()
         }
         guard !reduceMotion else {return}
         ctx.saveGState()
-        ctx.setShadow(offset:.zero,blur:9,color:accent.withAlphaComponent(0.65*fade).cgColor)
+        ctx.setShadow(offset:.zero,blur:27,color:accent.withAlphaComponent(0.95*fade).cgColor)
         if scene == 2 {
             // Moving branched arcs skim the lettering; no full-screen flashes.
-            for branch in 0..<3 {
+            for branch in 0..<9 {
                 let path=CGMutablePath()
-                let startX=origin.x+width*CGFloat(branch)/2
-                path.move(to:CGPoint(x:startX,y:origin.y-height*0.55))
+                let startX=origin.x+width*CGFloat(branch)/8
+                path.move(to:CGPoint(x:startX,y:origin.y-height*1.5))
                 for step in 1...18 {
                     let f=CGFloat(step)/18
-                    let x=startX+(beam-startX)*f+CGFloat(sin(Double(step)*2.1+phase*3+Double(branch)))*7*sin(f * .pi)
-                    let y=origin.y-height*0.55+height*1.35*f
+                    let x=startX+(beam-startX)*f+CGFloat(sin(Double(step)*2.1+phase*3+Double(branch)))*24*sin(f * .pi)
+                    let y=origin.y-height*1.5+height*2.35*f
                     path.addLine(to:CGPoint(x:x,y:y))
                 }
+                ctx.addPath(path);ctx.setLineWidth(2.0)
+                ctx.setStrokeColor(accent.withAlphaComponent(fade*0.85).cgColor);ctx.strokePath()
                 ctx.addPath(path);ctx.setLineWidth(0.65)
-                ctx.setStrokeColor(accent.withAlphaComponent(fade*0.65).cgColor);ctx.strokePath()
+                ctx.setStrokeColor(NSColor.white.withAlphaComponent(fade*0.9).cgColor);ctx.strokePath()
+                // Smaller forks split off the main arc near the wordmark.
+                let fork=CGMutablePath()
+                fork.move(to:CGPoint(x:beam,y:origin.y+height*0.65))
+                fork.addLine(to:CGPoint(x:beam+CGFloat(branch-4)*14,y:origin.y+height*0.95))
+                fork.addLine(to:CGPoint(x:beam+CGFloat(branch-4)*27,y:origin.y+height*1.45))
+                ctx.addPath(fork);ctx.setLineWidth(0.8)
+                ctx.setStrokeColor(accent.withAlphaComponent(fade*0.55).cgColor);ctx.strokePath()
             }
         }
         if scene == 1 || scene == 2 {
             let sparkY=origin.y+height*(0.35+0.2*sin(phase))
-            for i in 0..<32 {
-                let f=CGFloat(i)/32
-                let px=beam-f*width*0.18
-                let py=sparkY+sin(CGFloat(i)*2.4+phase)*f*height*0.65
+            for i in 0..<96 {
+                let f=CGFloat(i)/96
+                let px=beam-f*width*0.54
+                let py=sparkY+sin(CGFloat(i)*2.4+phase)*f*height*1.95
                 accent.withAlphaComponent((1-f)*fade*0.75).setFill()
-                NSRect(x:px,y:py,width:1.1,height:1.1).fill()
+                NSRect(x:px,y:py,width:1.8,height:1.8).fill()
             }
             NSColor.white.withAlphaComponent(fade).setFill()
-            NSRect(x:beam,y:sparkY,width:2,height:2).fill()
+            NSRect(x:beam,y:sparkY,width:4,height:4).fill()
         }
         ctx.restoreGState()
     }
