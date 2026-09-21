@@ -341,8 +341,10 @@ class Delegate: NSObject,NSApplicationDelegate {
     let current=process(aero,["list-workspaces","--focused"]).1.trimmingCharacters(in:.whitespacesAndNewlines)
     guard ["1","2","3","4","5"].contains(current) else {return}
     _=process(aero,["focus","--dfs-index","0"])
-    let output=process(aero,["list-windows","--focused","--format","%{app-pid}"])
-    var chosenPID=Int32(output.1.trimmingCharacters(in:.whitespacesAndNewlines))
+    let output=process(aero,["list-windows","--focused","--format","%{app-pid} %{window-layout}"])
+    let fields=output.1.split(separator:" ").map(String.init)
+    let excludedLayouts=["floating","macos_native_window_of_hidden_app","macos_fullscreen"]
+    var chosenPID=(fields.count >= 2 && !excludedLayouts.contains(fields[1])) ? Int32(fields[0]) : nil
     var chosenWindow:AXUIElement?
 
     // A minimized window disappears from AeroSpace's inventory. Fall back to
