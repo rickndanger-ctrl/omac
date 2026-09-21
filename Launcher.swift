@@ -107,6 +107,7 @@ if CommandLine.arguments.contains("--guide") {
  exit(0)
 }
 if CommandLine.arguments.contains("--login") {
+ guard AXIsProcessTrusted() else {fputs("Grant Agent Control Center Device Control access before login startup.\n",stderr);exit(2)}
  let result=process("/opt/homebrew/bin/python3",[root+"/control.py","login"])
  if !result.1.isEmpty {fputs(result.1, result.0==0 ? stdout:stderr)}
  exit(result.0)

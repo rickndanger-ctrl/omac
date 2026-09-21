@@ -204,7 +204,8 @@ def login():
  if marker.exists() and marker.read_text()!=boot_session():
   (STATE/'windows.json').unlink(missing_ok=True)
  marker.write_text(boot_session())
- save_status('Inactive')
+ if aero('config','--config-path',check=False)!=str(ROOT/'config/aerospace.toml'):
+  save_status('Inactive')
  (STATE/'menu.enabled').touch()
  load('menu');run('launchctl','kickstart',job('menu'))
  return enter()
@@ -213,8 +214,8 @@ def login_enabled(enabled):
  if enabled:
   destination.parent.mkdir(parents=True,exist_ok=True)
   destination.write_bytes((ROOT/'launchd/login.plist').read_bytes())
-  if subprocess.run(['launchctl','print',job('login')],capture_output=True).returncode:
-   run('launchctl','bootstrap',DOMAIN,destination)
+  run('launchctl','bootout',job('login'),check=False)
+  run('launchctl','bootstrap',DOMAIN,destination)
   return 'Omac will start after macOS sign-in.'
  run('launchctl','bootout',job('login'),check=False)
  destination.unlink(missing_ok=True)
