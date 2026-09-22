@@ -8,7 +8,9 @@ if [[ -z "$identity" ]]; then
  identity="$(security find-identity -v -p codesigning | sed -n 's/.*"\(Apple Development:.*\)"/\1/p' | head -n 1)"
 fi
 identity="${identity:--}"
-version=1.2.0-preview
+version=1.2.1-preview
+build_number=121
+source_commit="$(git rev-parse HEAD)"
 arch="$(uname -m)"
 out="$PWD/dist"
 stage="$out/staging"
@@ -20,7 +22,8 @@ swiftc -O -target "$arch-apple-macosx14.0" "$stage/main.swift" -o "$app/Contents
 rm "$stage/main.swift"
 cp Info.plist "$app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $version" "$app/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c 'Add :CFBundleVersion string 120' "$app/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $build_number" "$app/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Add :OmacSourceCommit string $source_commit" "$app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c 'Add :LSMinimumSystemVersion string 14.0' "$app/Contents/Info.plist"
 cp branding/Omac.png "$app/Contents/Resources/Payload/branding/"
 cp branding/Omac.icns "$app/Contents/Resources/"
