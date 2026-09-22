@@ -522,6 +522,10 @@ class Delegate: NSObject,NSApplicationDelegate {
  }
  @objc func toggleAnimatedWallpaper(_ sender:NSMenuItem) {
   let enable=sender.state != .on
+  setAnimatedWallpaper(enable)
+  sender.state = enable ? .on:.off
+ }
+ func setAnimatedWallpaper(_ enable:Bool) {
   let domain="gui/\(getuid())",label="com.richard.omac.wallpaper"
   let plist=NSHomeDirectory()+"/Library/LaunchAgents/\(label).plist"
   let marker=state.appendingPathComponent("animated-wallpaper.disabled")
@@ -530,19 +534,17 @@ class Delegate: NSObject,NSApplicationDelegate {
    _=process("/bin/launchctl",["enable",domain+"/"+label])
    let loaded=process("/bin/launchctl",["bootstrap",domain,plist])
    if loaded.0 != 0 {_=process("/bin/launchctl",["kickstart","-k",domain+"/"+label])}
-   sender.state = .on
   } else {
    FileManager.default.createFile(atPath:marker.path,contents:Data())
    _=process("/bin/launchctl",["disable",domain+"/"+label])
    _=process("/bin/launchctl",["bootout",domain+"/"+label])
-   sender.state = .off
   }
  }
  func applicationWillTerminate(_ notification:Notification) {focusBorder.setEngaged(false)}
  @objc func urlEvent(_ event:NSAppleEventDescriptor,reply:NSAppleEventDescriptor) {
   if let text=event.paramDescriptor(forKeyword:AEKeyword(keyDirectObject))?.stringValue,let url=URLComponents(string:text),url.host=="launch",let bundle=url.queryItems?.first(where:{$0.name=="bundle"})?.value {launchShelfApp(bundle);return}
 
-  if let text=event.paramDescriptor(forKeyword:AEKeyword(keyDirectObject))?.stringValue, let action=URL(string:text)?.host, ["exit","pause","enter","four","six","new","guide","menu","center","rescue","refocus","cycle-next","cycle-previous","shelf","shelf-add","shelf-tuck","place-left","place-right"].contains(action) {perform(action)}
+  if let text=event.paramDescriptor(forKeyword:AEKeyword(keyDirectObject))?.stringValue, let action=URL(string:text)?.host, ["exit","pause","enter","four","six","new","guide","menu","center","rescue","refocus","cycle-next","cycle-previous","shelf","shelf-add","shelf-tuck","place-left","place-right","wallpaper-toggle"].contains(action) {perform(action)}
  }
  @objc func showThemedMenu(_ sender:Any?) {
   if menuPanel.isVisible {menuPanel.dismiss();return}
@@ -666,6 +668,7 @@ class Delegate: NSObject,NSApplicationDelegate {
   } catch {shelfError(error)}
  }
  func perform(_ action:String) {
+  if action=="wallpaper-toggle" {setAnimatedWallpaper(!wallpaperEnabled());return}
   if action=="cycle-next" || action=="cycle-previous" {
    do {try windowCycler.cycle(action=="cycle-next" ? .next:.previous)} catch {shelfError(error)}
    return
