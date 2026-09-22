@@ -148,6 +148,8 @@ def _restore_mixed_members(members):
    aero('fullscreen','off','--window-id',str(window['window-id']))
    aero('layout','--window-id',str(window['window-id']),'floating')
    _set_frame(window,member['original-frame'])
+   if member['original-layout'] in ('h_tiles','v_tiles'):
+    aero('layout','--window-id',str(window['window-id']),'tiling')
    aero('layout','--window-id',str(window['window-id']),member['original-layout'])
   except Exception as exc: errors.append(f"{window.get('window-id')}: {exc}")
  return errors
