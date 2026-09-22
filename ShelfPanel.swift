@@ -157,6 +157,7 @@ final class OmacMenuPanel: NSPanel, NSSearchFieldDelegate {
     private var query = ""
     private var presentationAnchor: NSRect?
     private let searchField = NSSearchField()
+    private var rebuildingForSearch = false
 
     /// Called once whenever a presented panel is dismissed or an action is chosen.
     var onClose: (() -> Void)?
@@ -315,7 +316,7 @@ final class OmacMenuPanel: NSPanel, NSSearchFieldDelegate {
         searchField.placeholderString = "Search apps and controls"
         searchField.sendsSearchStringImmediately = true
         searchField.delegate = self
-        searchField.stringValue = query
+        if searchField.stringValue != query { searchField.stringValue = query }
         searchField.focusRingType = .none
         view.addSubview(searchField)
 
@@ -457,10 +458,20 @@ final class OmacMenuPanel: NSPanel, NSSearchFieldDelegate {
     }
 
     func controlTextDidChange(_ notification: Notification) {
+        guard !rebuildingForSearch else { return }
+        let selection = (searchField.currentEditor() as? NSTextView)?.selectedRange
         query = searchField.stringValue
         selectedPosition = 0
+        rebuildingForSearch = true
         rebuild(anchor: presentationAnchor)
         makeFirstResponder(searchField)
+        if let selection, let editor = searchField.currentEditor() as? NSTextView {
+            let length = (editor.string as NSString).length
+            let location = min(selection.location, length)
+            let selectedLength = min(selection.length, length - location)
+            editor.setSelectedRange(NSRange(location: location, length: selectedLength))
+        }
+        rebuildingForSearch = false
     }
 
     func control(_ control: NSControl, textView: NSTextView,
