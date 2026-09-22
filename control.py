@@ -3,6 +3,7 @@
 import fcntl,json,math,os,plistlib,subprocess,sys,time
 from functools import lru_cache
 from pathlib import Path
+sys.dont_write_bytecode=True
 from portable_paths import SOURCE as ROOT, STATE, RUNTIME, AERO, APP
 STATE.mkdir(parents=True,exist_ok=True)
 DOMAIN=f'gui/{os.getuid()}'

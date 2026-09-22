@@ -1,5 +1,6 @@
 from pathlib import Path
 import plistlib,shlex,os,sys,json
+sys.dont_write_bytecode=True
 from portable_paths import SOURCE as r, STATE as s, RUNTIME, APP as app, PYTHON, AERO, AERO_APP, GHOSTTY_APP
 (RUNTIME/'config').mkdir(parents=True,exist_ok=True)
 (RUNTIME/'launchd').mkdir(parents=True,exist_ok=True)

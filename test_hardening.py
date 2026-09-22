@@ -60,4 +60,8 @@ class Hardening(unittest.TestCase):
   script=Path('Install Omac.command').read_text()
   self.assertIn('Device Control and Data Access',script)
   self.assertIn('major < 27',script)
+ def test_bundled_python_never_writes_into_the_signed_app(self):
+  for name in ('control.py','generate_config.py'):
+   source=Path(name).read_text()
+   self.assertLess(source.index('sys.dont_write_bytecode=True'),source.index('from portable_paths import'))
 if __name__=='__main__':unittest.main()
