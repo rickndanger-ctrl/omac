@@ -25,6 +25,34 @@ class MixedLayout(unittest.TestCase):
   self.assertEqual([(m['window-id'],m['app-pid']) for m in saved['members']],[(10,110),(20,120),(21,121),(22,122)])
   self.assertEqual(set_frame.call_count,4)
   self.assertEqual(aero.call_args_list[-1].args,('focus','--window-id','10'))
+ def test_explicit_width_presets_divide_app_and_terminal_area(self):
+  visible=[0,0,1200,900]
+  third=c._mixed_frames(visible,2,app_width='1/3');half=c._mixed_frames(visible,2,app_width='1/2');wide=c._mixed_frames(visible,2,app_width='2/3')
+  self.assertLess(third[0][2],half[0][2]);self.assertLess(half[0][2],wide[0][2])
+  for frames in (third,half,wide):
+   self.assertEqual(frames[0][2]+8+frames[1][2],1184)
+   self.assertEqual(frames[1][2],frames[2][2])
+   self.assertEqual(frames[1][3]+8+frames[2][3],884)
+ def test_narrow_app_rejection_restores_every_started_member(self):
+  calls=[]
+  def set_frame(window,frame):
+   calls.append((window['window-id'],frame))
+   if window['window-id']==10 and len(calls)==1: raise RuntimeError('minimum width refused')
+  with patch.object(c,'boot_session',return_value='boot'),patch.object(c,'terminal_windows',return_value=self.terminals), \
+       patch.object(c,'aero',side_effect=['2',json.dumps([self.app]),*(['']*20)]), \
+       patch.object(c,'_native_target',side_effect=self.target),patch.object(c,'_set_frame',side_effect=set_frame):
+   with self.assertRaisesRegex(RuntimeError,'rollback was attempted'):c.apply_mixed(2,app_width='1/3')
+  self.assertIn((10,[0,0,400,700]),calls)
+  self.assertFalse((c.STATE/'mixed-layout.json').exists())
+ def test_menu_selected_identity_is_revalidated_in_current_page_inventory(self):
+  with patch.object(c,'boot_session',return_value='boot'),patch.object(c,'terminal_windows',return_value=self.terminals), \
+       patch.object(c,'windows',return_value=[self.app,*self.terminals]), \
+       patch.object(c,'aero',side_effect=['2',*(['']*20)]),patch.object(c,'_native_target',side_effect=self.target),patch.object(c,'_set_frame'):
+   self.assertIn('1/2 width',c.apply_mixed(2,selected_identity=(10,110)))
+ def test_menu_selected_identity_refuses_recycled_pid_before_resize(self):
+  with patch.object(c,'aero',return_value='2'),patch.object(c,'windows',return_value=[dict(self.app,**{'app-pid':999})]),patch.object(c,'_set_frame') as set_frame:
+   with self.assertRaisesRegex(RuntimeError,'no longer available'):c.apply_mixed(2,selected_identity=(10,110))
+  set_frame.assert_not_called()
  def test_apply_failure_rolls_back_and_does_not_publish_checkpoint(self):
   calls=[]
   def set_frame(window,frame):
@@ -125,6 +153,19 @@ class MixedLayout(unittest.TestCase):
        patch.object(c,'_set_frame') as set_frame:
    with self.assertRaisesRegex(RuntimeError,'not a valid member'):c.mixed_expand_toggle()
   set_frame.assert_not_called()
+ def test_menu_mixed_expand_uses_captured_identity_not_helper_focus(self):
+  self.checkpoint();live=[self.app,*self.terminals]
+  with patch.object(c,'boot_session',return_value='boot'),patch.object(c,'page',return_value='2'), \
+       patch.object(c,'windows',return_value=live),patch.object(c,'aero') as aero, \
+       patch.object(c,'_native_target',return_value=self.target(self.app)),patch.object(c,'_set_frame') as set_frame:
+   self.assertIn('expanded',c.mixed_expand_toggle(selected_identity=(10,110)))
+  aero.assert_not_called();self.assertEqual(set_frame.call_args.args[0],self.app)
+ def test_menu_mixed_expand_refuses_missing_captured_identity(self):
+  self.checkpoint();live=[dict(self.app,**{'app-pid':999}),*self.terminals]
+  with patch.object(c,'boot_session',return_value='boot'),patch.object(c,'page',return_value='2'), \
+       patch.object(c,'windows',return_value=live),patch.object(c,'aero') as aero,patch.object(c,'_set_frame') as set_frame:
+   with self.assertRaisesRegex(RuntimeError,'no longer available'):c.mixed_expand_toggle(selected_identity=(10,110))
+  aero.assert_not_called();set_frame.assert_not_called()
  def test_mixed_expand_failed_rollback_keeps_recovery_state(self):
   self.checkpoint();live=[self.app,*self.terminals]
   with patch.object(c,'boot_session',return_value='boot'),patch.object(c,'page',return_value='2'), \

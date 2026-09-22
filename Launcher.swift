@@ -358,6 +358,8 @@ class Delegate: NSObject,NSApplicationDelegate {
  var shelfIDs:[CGWindowID]=[]
  var shelfPage:String?
  var shelfTransition=false
+ var mixedTarget:(windowID:Int,appPID:Int)?
+ var pendingMixedMenuTarget:(windowID:Int,appPID:Int)?
  var shelfLaunchID=UUID()
  func shelfActive()->Bool {(try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8)) == "Active"}
  func currentShelfPage()->String {process(aerospace ?? "/missing/aerospace",["list-workspaces","--focused"]).1.trimmingCharacters(in:.whitespacesAndNewlines)}
@@ -448,7 +450,19 @@ class Delegate: NSObject,NSApplicationDelegate {
   DistributedNotificationCenter.default().addObserver(self,selector:#selector(showGuideNotification(_:)),name:NSNotification.Name("com.richard.acc.showGuide"),object:nil,suspensionBehavior:.deliverImmediately)
   item=NSStatusBar.system.statusItem(withLength:NSStatusItem.variableLength); statusTitle("▦ Omac")
   let menu=NSMenu()
-  let pages=NSMenuItem(title:"Omac Pages",action:nil,keyEquivalent:"");let pageMenu=NSMenu();for n in 1...5 {let e=NSMenuItem(title:"Page \(n)    ⌘\(n)",action:#selector(selectPage(_:)),keyEquivalent:"");e.tag=n;e.target=self;pageMenu.addItem(e)};pages.submenu=pageMenu;menu.addItem(pages);menu.addItem(.separator())
+  let pages=NSMenuItem(title:"Omac Pages",action:nil,keyEquivalent:"");let pageMenu=NSMenu()
+  for n in 1...5 {let entry=NSMenuItem(title:"Page \(n)    ⌘\(n)",action:#selector(selectPage(_:)),keyEquivalent:"");entry.tag=n;entry.target=self;pageMenu.addItem(entry)}
+  pages.submenu=pageMenu;menu.addItem(pages);menu.addItem(.separator())
+  let mixed=NSMenuItem(title:"Mixed Layout",action:nil,keyEquivalent:"");let mixedMenu=NSMenu()
+  for (title,action) in [("App ⅓ + 2 terminals","mixed-2-third"),("App ½ + 2 terminals","mixed-2-half"),("App ⅔ + 2 terminals","mixed-2-two-thirds"),("App ⅓ + 3 terminals","mixed-3-third"),("App ½ + 3 terminals","mixed-3-half"),("App ⅔ + 3 terminals","mixed-3-two-thirds")] {
+   let entry=NSMenuItem(title:title,action:#selector(selected(_:)),keyEquivalent:"");entry.representedObject=action;entry.target=self;mixedMenu.addItem(entry)
+   if action=="mixed-2-two-thirds" {mixedMenu.addItem(.separator())}
+  }
+  mixedMenu.addItem(.separator())
+  for (title,action) in [("Expand / Return Focused Tile","mixed-expand"),("Restore Mixed Layout","mixed-restore")] {
+   let entry=NSMenuItem(title:title,action:#selector(selected(_:)),keyEquivalent:"");entry.representedObject=action;entry.target=self;mixedMenu.addItem(entry)
+  }
+  mixed.submenu=mixedMenu;menu.addItem(mixed);menu.addItem(.separator())
   for (title,action) in [("Engage Omac","enter"),("Open / Arrange 4 Terminals","four"),("Open / Arrange 6 Terminals","six"),("New Terminal (up to 6)","new"),("Pause Tiling and Shortcuts","pause"),("Disengage Omac — Restore Windows","exit"),("Shortcut Guide","guide"),("Choose Shelf App    ⌃⌥Space","shelf"),("Add Current App to Shelf    ⌃⌥⇧Space","shelf-add"),("Tuck Shelf Apps Away    ⌘⌥↓","shelf-tuck"),("Accessibility Settings","access"),("Start Omac at Login","enable-login"),("Disable Login Startup","disable-login"),("Quit Omac","quit")] {
    let m=NSMenuItem(title:title,action:#selector(selected(_:)),keyEquivalent:""); m.representedObject=action; m.target=self; menu.addItem(m)
   }
@@ -502,7 +516,14 @@ class Delegate: NSObject,NSApplicationDelegate {
  @objc func showThemedMenu(_ sender:Any?) {
   if menuPanel.isVisible {menuPanel.dismiss();return}
   guide?.orderOut(nil);shelfPanel.orderOut(nil)
+  captureMixedTarget()
   if let menu=menuModel {menuPanel.present(menu:menu,anchor:item.button?.window?.frame)}
+ }
+ func captureMixedTarget() {
+  let result=process(aerospace ?? "/missing/aerospace",["list-windows","--focused","--format","%{window-id} %{app-pid}","--json"])
+  guard result.0==0,let rows=(try? JSONSerialization.jsonObject(with:Data(result.1.utf8))) as? [[String:Any]],let row=rows.first,
+        let id=row["window-id"] as? Int,let pid=row["app-pid"] as? Int else {mixedTarget=nil;return}
+  mixedTarget=(id,pid)
  }
  func refreshFavoriteMenu() {
   favoriteMenu.removeAllItems()
@@ -578,7 +599,16 @@ class Delegate: NSObject,NSApplicationDelegate {
  @objc func openSettings(_ sender:NSMenuItem) {
   if let value=sender.representedObject as? String,let url=URL(string:value) {NSWorkspace.shared.open(url)}
  }
- @objc func selected(_ sender:NSMenuItem) { perform(sender.representedObject as! String) }
+ @objc func selected(_ sender:NSMenuItem) {
+  let action=sender.representedObject as! String
+  if action.hasPrefix("mixed-") && action != "mixed-restore" {
+   guard let target=mixedTarget else {
+    let alert=NSAlert();alert.messageText="Choose an app or mixed tile first";alert.informativeText="Omac could not identify the window that was focused before the menu opened.";alert.runModal();return
+   }
+   pendingMixedMenuTarget=target
+  } else {pendingMixedMenuTarget=nil}
+  perform(action)
+ }
  @objc func showGuideNotification(_ notification:Notification) {
   let value=notification.userInfo?["page"] as? String
   showGuide(page: value?.isEmpty==false ? value:nil)
@@ -715,6 +745,7 @@ class Delegate: NSObject,NSApplicationDelegate {
 
   if action=="menu" {
    guide?.orderOut(nil);shelfPanel.orderOut(nil)
+   captureMixedTarget()
    if let menu=menuModel {menuPanel.present(menu:menu)}
    return
   }
@@ -731,14 +762,15 @@ class Delegate: NSObject,NSApplicationDelegate {
    _=AXIsProcessTrustedWithOptions([key:true] as CFDictionary)
    NSWorkspace.shared.open(URL(string:"x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!); return
   }
-  if ["pause","exit","quit"].contains(action) {
-   do {try shelf.releaseAll();refreshShelf();shelfPanel.orderOut(nil)} catch {shelfError(error);return}
-   guide?.orderOut(nil)
-   focusBorder.setEngaged(false)
-  }
+  if ["pause","exit","quit"].contains(action) {do {try shelf.releaseAll();refreshShelf();shelfPanel.orderOut(nil)} catch {shelfError(error);return};focusBorder.setEngaged(false);guide?.orderOut(nil)}
+  let selectedMixedTarget=pendingMixedMenuTarget;pendingMixedMenuTarget=nil
   guard !busy else {return}; busy=true; statusTitle("▦ Omac · Working…")
   DispatchQueue.global().async {
-   let result=process(python ?? "/missing/python3",[root+"/control.py",action=="quit" ? "exit":action])
+   var arguments=[root+"/control.py",action=="quit" ? "exit":action]
+   if let target=selectedMixedTarget {
+    arguments += ["--window-id",String(target.windowID),"--app-pid",String(target.appPID)]
+   }
+   let result=process(python ?? "/missing/python3",arguments)
    DispatchQueue.main.async {
     self.busy=false
     let status=(try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8)) ?? "Inactive"

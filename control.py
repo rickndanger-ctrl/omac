@@ -124,11 +124,15 @@ def _set_frame(window,frame):
   if matches>=2:return
   time.sleep(.05)
  raise RuntimeError('Window did not settle at its requested frame.')
-def _mixed_frames(visible,count,app_side='left',gap=8):
+def _mixed_frames(visible,count,app_side='left',gap=8,app_width='1/2'):
  x,y,width,height=visible; x+=gap;y+=gap;width-=2*gap;height-=2*gap
  if width<=3*gap or height<=(count+1)*gap: raise RuntimeError('Screen is too small for mixed layout.')
- half=(width-gap)//2;left=[x,y,half,height];right=[x+half+gap,y,width-half-gap,height]
- app,area=(left,right) if app_side=='left' else (right,left)
+ fractions={'1/3':(1,3),'1/2':(1,2),'2/3':(2,3)}
+ if app_width not in fractions: raise RuntimeError('Mixed app width must be 1/3, 1/2, or 2/3.')
+ numerator,denominator=fractions[app_width];usable=width-gap;app_width_points=usable*numerator//denominator
+ terminal_width=usable-app_width_points
+ if app_side=='left': app=[x,y,app_width_points,height];area=[x+app_width_points+gap,y,terminal_width,height]
+ else: area=[x,y,terminal_width,height];app=[x+terminal_width+gap,y,app_width_points,height]
  each=(area[3]-gap*(count-1))//count;frames=[app]
  top=area[1]
  for index in range(count):
@@ -147,14 +151,20 @@ def _restore_mixed_members(members):
    aero('layout','--window-id',str(window['window-id']),member['original-layout'])
   except Exception as exc: errors.append(f"{window.get('window-id')}: {exc}")
  return errors
-def apply_mixed(count,app_side='left'):
+def apply_mixed(count,app_side='left',app_width='1/2',selected_identity=None):
  if count not in (2,3): raise RuntimeError('Mixed layout requires two or three terminals.')
  if _read_mixed(): raise RuntimeError('Restore the current mixed layout before applying another.')
  workspace=aero('list-workspaces','--focused').strip()
  if workspace not in ('1','2','3','4','5'): raise RuntimeError('Focused window is outside an Omac page.')
- focused=json.loads(aero('list-windows','--focused','--format','%{window-id} %{app-pid} %{app-name} %{workspace} %{window-layout}','--json'))
- if not focused: raise RuntimeError('Focus the native app to place first.')
- app=focused[0]
+ if selected_identity:
+  wanted_id,wanted_pid=selected_identity
+  matches=[row for row in windows() if row.get('window-id')==wanted_id and row.get('app-pid')==wanted_pid and row.get('workspace')==workspace]
+  if len(matches)!=1: raise RuntimeError('The app selected before opening the Omac menu is no longer available on this page.')
+  app=matches[0]
+ else:
+  focused=json.loads(aero('list-windows','--focused','--format','%{window-id} %{app-pid} %{app-name} %{workspace} %{window-layout}','--json'))
+  if not focused: raise RuntimeError('Focus the native app to place first.')
+  app=focused[0]
  if app.get('app-name')=='Ghostty' or app.get('workspace')!=workspace:
   raise RuntimeError('Focus a nonterminal app on the current Omac page.')
  terminals=terminal_windows(workspace)[:count]
@@ -168,9 +178,9 @@ def apply_mixed(count,app_side='left'):
   elif not _same_frame(target['visibleFrame'],visible): raise RuntimeError('All mixed-layout windows must be on one display.')
   snapshots.append({'window-id':window['window-id'],'app-pid':window['app-pid'],'workspace':workspace,
                     'original-frame':target['frame'],'original-layout':window['window-layout']})
- frames=_mixed_frames(visible,count,app_side);changed=[]
+ frames=_mixed_frames(visible,count,app_side,app_width=app_width);changed=[]
  checkpoint={'boot':boot_session(),'workspace':workspace,'app-side':app_side,
-             'state':'applying','members':snapshots}
+             'app-width':app_width,'state':'applying','members':snapshots}
  _write_mixed(checkpoint)
  try:
   for window,member,frame in zip(selected,snapshots,frames):
@@ -187,7 +197,7 @@ def apply_mixed(count,app_side='left'):
   suffix=(' Rollback errors: '+'; '.join(errors)) if errors else ''
   raise RuntimeError(f'Mixed layout failed and rollback was attempted: {exc}.{suffix}') from exc
  aero('focus','--window-id',str(app['window-id']))
- return f'Mixed layout applied to one app and {count} terminals.'
+ return f'Mixed layout applied with the app at {app_width} width and {count} terminals.'
 def restore_mixed():
  data=_read_mixed()
  if not data: return 'No mixed layout is active.'
@@ -232,7 +242,7 @@ def focus_direction(direction):
     return 'No mixed-layout window in that direction.'
  aero('focus','--ignore-floating',direction,check=False)
  return 'Used ordinary tile navigation.'
-def mixed_expand_toggle():
+def mixed_expand_toggle(selected_identity=None):
  data=_read_mixed()
  if not data: raise RuntimeError('Apply Mixed Layout before expanding a mixed window.')
  if data.get('state')!='active': raise RuntimeError('Restore the incomplete mixed layout before expanding a window.')
@@ -240,9 +250,14 @@ def mixed_expand_toggle():
  if data.get('boot')!=boot_session() or workspace!=page():
   raise RuntimeError('Mixed layout boot or page changed; expand refused.')
  live={w['window-id']:w for w in windows()}
- focused=json.loads(aero('list-windows','--focused','--format','%{window-id} %{app-pid} %{workspace}','--json'))
- if not focused: raise RuntimeError('Focus a mixed-layout window first.')
- row=focused[0];member=next((item for item in data.get('members',[]) if item.get('window-id')==row.get('window-id')),None)
+ if selected_identity:
+  wanted_id,wanted_pid=selected_identity;row=live.get(wanted_id)
+  if not row or row.get('app-pid')!=wanted_pid: raise RuntimeError('The mixed tile selected before opening the Omac menu is no longer available.')
+ else:
+  focused=json.loads(aero('list-windows','--focused','--format','%{window-id} %{app-pid} %{workspace}','--json'))
+  if not focused: raise RuntimeError('Focus a mixed-layout window first.')
+  row=focused[0]
+ member=next((item for item in data.get('members',[]) if item.get('window-id')==row.get('window-id')),None)
  current=live.get(row.get('window-id'))
  if (not member or not current or current.get('app-pid')!=member.get('app-pid') or
      row.get('app-pid')!=member.get('app-pid') or current.get('workspace')!=workspace or row.get('workspace')!=workspace):
@@ -453,18 +468,27 @@ def recover():
 
 def main():
  action=sys.argv[1] if len(sys.argv)>1 else 'status'
+ selected_identity=None
+ if '--window-id' in sys.argv or '--app-pid' in sys.argv:
+  try:selected_identity=(int(sys.argv[sys.argv.index('--window-id')+1]),int(sys.argv[sys.argv.index('--app-pid')+1]))
+  except (ValueError,IndexError) as exc: raise RuntimeError('Both a valid window ID and app PID are required.') from exc
  with (STATE/'controller.lock').open('w') as lock:
   fcntl.flock(lock,fcntl.LOCK_EX)
   if action=='login': print(login())
   elif action=='enable-login': print(login_enabled(True))
   elif action=='disable-login': print(login_enabled(False))
   elif action=='recover': print(recover())
-  elif action in ('mixed-2','mixed-3'): print(apply_mixed(int(action[-1])))
+  elif action in ('mixed-2','mixed-3'): print(apply_mixed(int(action[-1]),selected_identity=selected_identity))
+  elif action.startswith('mixed-') and action.endswith(('third','half','two-thirds')):
+   parts=action.split('-',2)
+   if len(parts)<3 or parts[1] not in ('2','3'): raise RuntimeError('Unknown mixed layout action.')
+   widths={'third':'1/3','half':'1/2','two-thirds':'2/3'}
+   print(apply_mixed(int(parts[1]),app_width=widths[parts[2]],selected_identity=selected_identity))
   elif action=='mixed-restore': print(restore_mixed())
   elif action=='focus-direction':
    if len(sys.argv)<3: raise RuntimeError('Usage: control.py focus-direction <left|right|up|down>')
    print(focus_direction(sys.argv[2]))
-  elif action=='mixed-expand': print(mixed_expand_toggle())
+  elif action=='mixed-expand': print(mixed_expand_toggle(selected_identity=selected_identity))
   elif action=='tile-command':
    if len(sys.argv)<3: raise RuntimeError('Usage: control.py tile-command <swap|resize|balance> [value]')
    print(tile_command(sys.argv[2],sys.argv[3] if len(sys.argv)>3 else None))
