@@ -151,6 +151,6 @@ for name,args,keep in [
  ('login',[app,'--login'],False),
  ('menu',[app,'--managed'],{'PathState':{str(s/'menu.enabled'):True}}),
  ('aerospace',[str(Path(AERO_APP)/'Contents/MacOS/AeroSpace'),'--config-path',str(RUNTIME/'config/aerospace.toml')],{'PathState':{str(s/'aerospace.enabled'):True}}),
- *[('terminal.'+role.lower(),['/usr/bin/open','-W','-n','-a',GHOSTTY_APP,'--args','--title=Omac · '+role,'--config-file='+str(r/'config/ghostty.conf'),'--working-directory='+str(Path.home()/'Documents')],False) for role in [str(i) for i in range(1,31)]]]:
+ *[('terminal.'+role.lower(),['/usr/bin/open','-W','-n','-a',GHOSTTY_APP,'--args','--title=ACC · '+role,'--config-file='+str(r/'config/ghostty.conf'),'--working-directory='+str(Path.home()/'Documents')],False) for role in [str(i) for i in range(1,31)]]]:
  d={'Label':'com.richard.acc.'+name,'ProgramArguments':args,'RunAtLoad':name=='login','KeepAlive':keep,'ThrottleInterval':5,'EnvironmentVariables':env,'StandardOutPath':str(s/(name+'.log')),'StandardErrorPath':str(s/(name+'.error.log'))}
  (RUNTIME/'launchd'/f'{name}.plist').write_bytes(plistlib.dumps(d))

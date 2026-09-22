@@ -21,6 +21,24 @@ class Lifecycle(unittest.TestCase):
    self.assertIn('6 plain',c.enter(add=True))
    arrange.assert_not_called();run.assert_not_called()
    self.assertFalse(any(call.args[0]=='reload-config' for call in aero.call_args_list))
+ def test_new_terminal_keeps_origin_and_existing_layout(self):
+  c.save_status('Active')
+  launched=[False]
+  old={'window-id':1,'window-title':'ACC · 1','workspace':'2'}
+  new={'window-id':2,'window-title':'ACC · 2','workspace':'2'}
+  def aero(*args,**kwargs):
+   if args[:2]==('config','--config-path'): return str(c.RUNTIME/'config/aerospace.toml')
+   if args[:2]==('list-workspaces','--focused'): return '2'
+   return ''
+  def terminals(workspace=None): return [old,new] if launched[0] else [old]
+  def run(*args,**kwargs):
+   if args[:2]==('launchctl','kickstart'): launched[0]=True
+   return ''
+  with patch.object(c,'aero',side_effect=aero) as commands,patch.object(c,'run',side_effect=run),patch.object(c,'load'),patch.object(c,'job_running',return_value=False),patch.object(c,'terminal_windows',side_effect=terminals),patch.object(c,'arrange') as arrange,patch.object(c,'start_services') as services:
+   self.assertIn('2 plain',c.enter(add=True))
+   arrange.assert_not_called();services.assert_not_called()
+   commands.assert_any_call('workspace','2')
+   commands.assert_any_call('focus','--window-id','2')
  def test_grid_reset_is_one_batch_and_preserves_focus(self):
   tiles=[{'window-id':i,'window-title':'ACC · '+str(i)} for i in range(1,7)]
   cursor=['3']

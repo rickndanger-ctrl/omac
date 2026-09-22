@@ -441,6 +441,7 @@ def omac_config(path,expected=None):
  return all(marker in text for marker in markers)
 
 def enter(count=0,add=False):
+ origin=page() if add else None
  existing=aero('config','--config-path',check=False)
  if existing and not omac_config(existing):
   raise RuntimeError('Another AeroSpace configuration is active. Exit it before entering Omac.')
@@ -460,7 +461,7 @@ def enter(count=0,add=False):
    aero('mode','active')
   if not active and not existing: restore_pages()
   migrate_pages()
-  workspace=page()
+  workspace=origin or page()
   current=terminal_windows(workspace)
   if add: count=min(6,len(current)+1)
   present={w['window-title'] for w in terminal_windows()}
@@ -493,7 +494,8 @@ def enter(count=0,add=False):
    if added:
     aero('workspace',workspace)
     aero('focus','--window-id',str(added[-1]['window-id']))
-    arrange(workspace)
+    # AeroSpace already tiles the inserted window. Rebuilding the whole tree
+    # can expose another workspace and disturbs the user's native-app layout.
    total=len(terminal_windows(workspace))
   elif count:
    for w in terminal_windows():
@@ -504,7 +506,7 @@ def enter(count=0,add=False):
    total=len(current)
   save_status('Active')
   save_pages()
-  start_services()
+  if not active: start_services()
   return f'{total} plain terminal windows tiled. No agents launched.'
  except Exception:
   stop(True)
