@@ -4,7 +4,7 @@ This branch (`omac/native-packaging`) builds a portable engineering preview. The
 
 ## Build
 
-Run `OMAC_SIGN_IDENTITY='<identity>' ./package.sh`. It compiles an app, includes its resources and optional saver, runs tests, signs the bundles and creates a checksummed DMG. It neither installs nor notarizes. Move an existing `dist` aside before rebuilding. Without an identity it produces an ad-hoc engineering build.
+Run `./package.sh`. It compiles an app, includes its resources and optional saver, runs tests, signs the bundles and creates a checksummed DMG. It neither installs nor notarizes. Move an existing `dist` aside before rebuilding. The script reuses the first available Apple Development identity unless `OMAC_SIGN_IDENTITY` is set explicitly; it falls back to an ad-hoc engineering build only when no development identity is available.
 
 The app uses its own bundled resources, generates configs in each user's Application Support folder, discovers standard Homebrew/Python installations and diagnoses missing dependencies. The menu's Start at Login controls use native SMAppService registration; this new registration path still needs an actual installed-app login test. launchd continues supervising the window manager and watcher.
 

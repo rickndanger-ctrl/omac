@@ -68,6 +68,12 @@ let aerospace = installedExecutable(["/opt/homebrew/bin/aerospace","/usr/local/b
 
 let state = ProcessInfo.processInfo.environment["OMAC_STATE_ROOT"].map{URL(fileURLWithPath:$0)} ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/AgentControlCenter")
 let runtime=state.appendingPathComponent("runtime")
+func omacControlPermissionSettings() -> (label:String,url:String) {
+ let modern=ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 27
+ return modern
+  ? ("Device Control and Data Access","x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_Accessibility")
+  : ("Accessibility","x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+}
 func process(_ executable: String, _ args: [String]) -> (Int32, String) {
  let p = Process(); p.executableURL = URL(fileURLWithPath: executable); p.arguments = args
  var environment=ProcessInfo.processInfo.environment
@@ -470,7 +476,7 @@ class Delegate: NSObject,NSApplicationDelegate {
    let entry=NSMenuItem(title:title,action:#selector(selected(_:)),keyEquivalent:"");entry.representedObject=action;entry.target=self;mixedMenu.addItem(entry)
   }
   mixed.submenu=mixedMenu;menu.addItem(mixed);menu.addItem(.separator())
-  for (title,action) in [("Engage Omac","enter"),("Open / Arrange 4 Terminals","four"),("Open / Arrange 6 Terminals","six"),("New Terminal (up to 6)","new"),("Pause Tiling and Shortcuts","pause"),("Disengage Omac — Restore Windows","exit"),("Shortcut Guide","guide"),("Choose Shelf App    ⌃⌥Space","shelf"),("Add Current App to Shelf    ⌃⌥⇧Space","shelf-add"),("Tuck Shelf Apps Away    ⌘⌥↓","shelf-tuck"),("Accessibility Settings","access"),("Start Omac at Login","enable-login"),("Disable Login Startup","disable-login"),("Quit Omac","quit")] {
+  for (title,action) in [("Engage Omac","enter"),("Open / Arrange 4 Terminals","four"),("Open / Arrange 6 Terminals","six"),("New Terminal (up to 6)","new"),("Pause Tiling and Shortcuts","pause"),("Disengage Omac — Restore Windows","exit"),("Shortcut Guide","guide"),("Choose Shelf App    ⌃⌥Space","shelf"),("Add Current App to Shelf    ⌃⌥⇧Space","shelf-add"),("Tuck Shelf Apps Away    ⌘⌥↓","shelf-tuck"),("Control Permission Settings","access"),("Start Omac at Login","enable-login"),("Disable Login Startup","disable-login"),("Quit Omac","quit")] {
    let m=NSMenuItem(title:title,action:#selector(selected(_:)),keyEquivalent:""); m.representedObject=action; m.target=self; menu.addItem(m)
   }
   let border=NSMenuItem(title:"Yellow Focus Border",action:#selector(toggleFocusBorder(_:)),keyEquivalent:"")
@@ -488,7 +494,8 @@ class Delegate: NSObject,NSApplicationDelegate {
   }
   menu.addItem(.separator())
   let settings=NSMenuItem(title:"Settings",action:nil,keyEquivalent:"");let settingsMenu=NSMenu()
-  for (title,url) in [("System Settings","x-apple.systempreferences:"),("Displays","x-apple.systempreferences:com.apple.Displays-Settings.extension"),("Keyboard","x-apple.systempreferences:com.apple.Keyboard-Settings.extension"),("Accessibility Permission","x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")] {
+  let controlPermission=omacControlPermissionSettings()
+  for (title,url) in [("System Settings","x-apple.systempreferences:"),("Displays","x-apple.systempreferences:com.apple.Displays-Settings.extension"),("Keyboard","x-apple.systempreferences:com.apple.Keyboard-Settings.extension"),(controlPermission.label,controlPermission.url)] {
    let entry=NSMenuItem(title:title,action:#selector(openSettings(_:)),keyEquivalent:"");entry.representedObject=url;entry.target=self;settingsMenu.addItem(entry)
   }
   settings.submenu=settingsMenu;menu.addItem(settings)
@@ -788,7 +795,7 @@ class Delegate: NSObject,NSApplicationDelegate {
   if action=="access" {
    let key=kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
    _=AXIsProcessTrustedWithOptions([key:true] as CFDictionary)
-   NSWorkspace.shared.open(URL(string:"x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!); return
+   NSWorkspace.shared.open(URL(string:omacControlPermissionSettings().url)!); return
   }
   if ["pause","exit","quit"].contains(action) {do {try shelf.releaseAll();refreshShelf();shelfPanel.orderOut(nil)} catch {shelfError(error);return};focusBorder.setEngaged(false);guide?.orderOut(nil)}
   let selectedMixedTarget=pendingMixedMenuTarget;pendingMixedMenuTarget=nil

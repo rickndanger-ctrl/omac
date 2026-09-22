@@ -46,4 +46,18 @@ class Hardening(unittest.TestCase):
   self.assertIn('security find-identity -v -p codesigning',script)
   self.assertIn('Apple Development:',script)
   self.assertIn('OMAC_SIGN_IDENTITY',script)
+ def test_owned_legacy_config_is_not_mistaken_for_foreign(self):
+  path=Path(self.tmp.name)/'legacy.toml'
+  path.write_text("persistent-workspaces = ['1', '2', '3', '4', '5']\n[mode.active.binding]\nafter-startup-command = ['exec-and-forget python control.py recover']\n")
+  c.save_status('Active');(c.STATE/'aerospace.enabled').touch()
+  self.assertTrue(c.omac_config(str(path)))
+  self.assertFalse(c.omac_config('/another/config'))
+ def test_routes_macos_27_control_permission_panel(self):
+  source=Path('Launcher.swift').read_text()
+  self.assertIn('Device Control and Data Access',source)
+  self.assertIn('com.apple.settings.PrivacySecurity.extension?Privacy_Accessibility',source)
+ def test_installer_names_the_current_permission_panel(self):
+  script=Path('Install Omac.command').read_text()
+  self.assertIn('Device Control and Data Access',script)
+  self.assertIn('major < 27',script)
 if __name__=='__main__':unittest.main()

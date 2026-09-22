@@ -52,7 +52,10 @@ mkdir -p "$state"
 OMAC_STATE_ROOT="$state" "$target_app/Contents/MacOS/AgentControlCenter" --prepare-runtime
 codesign --verify --deep --strict "$target_app"
 print "Omac installed. Backup: $backup"
-print 'Open Omac from Applications. Approve Device Control for Omac and AeroSpace when prompted.'
+major="$(sw_vers -productVersion | cut -d. -f1)"
+permission_name='Accessibility'
+(( major < 27 )) || permission_name='Device Control and Data Access'
+print "Open Omac from Applications. Approve $permission_name for Omac and AeroSpace when prompted."
 print 'Login startup stays off until you choose Start Omac at Login.'
 # A successful install should open setup; tests/remote staging can suppress launch.
 if [[ "${OMAC_NO_LAUNCH:-0}" == 0 ]]; then open "$target_app"; fi

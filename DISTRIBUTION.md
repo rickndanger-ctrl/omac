@@ -29,7 +29,7 @@ Omac is intended as a SaaS product with a direct-download Mac companion. Account
 
 ## Reproducible build
 
-Run `OMAC_SIGN_IDENTITY='<signing identity>' ./package.sh`. Omitting the identity creates an ad-hoc development build. This command only creates artifacts; it does not install, register startup, publish or submit to Apple. Keep signing keys and notary credentials outside the repo and never ship them. The generated DMG is NOT notarized by this script.
+Run `./package.sh`. The script reuses the first available Apple Development identity unless `OMAC_SIGN_IDENTITY` is set explicitly; it falls back to an ad-hoc engineering build only when no development identity is available. This command only creates artifacts; it does not install, register startup, publish or submit to Apple. Keep signing keys and notary credentials outside the repo and never ship them. The generated DMG is NOT notarized by this script.
 
 Read-only dependency diagnosis: run `Omac.app/Contents/MacOS/AgentControlCenter --check`. This does not grant permissions or start tiling. For engineering tests use OMAC_STATE_ROOT to keep generated state separate.
 

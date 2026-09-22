@@ -16,6 +16,15 @@ Command-Escape focus rescue was hardened and verified on both Macs. In each live
 
 # Verification
 
+## Working checkpoint — September 21, 2026
+
+- The same Apple Development identity signs the installed app on both Macs. Replacing it with an ad-hoc build was the confirmed cause of the disappearing Device Control grant and yellow focus border; packaging now discovers and reuses the stable identity.
+- macOS 27 routes Omac's permission control to **Device Control and Data Access**. Earlier macOS versions retain the Accessibility route.
+- Mini 1 and Mini 2 both ran the signed helper with the animated wallpaper service enabled. The user visually confirmed Mini 2's yellow border; a separate WindowServer inventory also found Omac's visible border panel.
+- The keyboard-only Screen Sharing handoff was physically confirmed in both directions. Screen Sharing remains outside the tile tree, and ShareMouse was removed without touching LAN Mouse.
+- An upgrade-specific false alarm was reproduced: a running, Omac-owned AeroSpace config from the earlier checkout was mistaken for a foreign config by the portable controller. Omac now recognizes that guarded legacy state while continuing to refuse unrelated configurations.
+- These checks establish the current working checkpoint. First install, a new signing identity, or a macOS permission reset still requires the user to grant control access. Reboot, sleep/wake, and every display topology are not exhaustively certified.
+
 - macOS: 27.0 (26A428).
 - Claude Code 2.1.274 and Codex CLI 0.149.0 version commands passed; Hermes help passed.
 - Local Qwen launcher found and inspected; existing Full Local mode prerequisite preserved. No generation sent.

@@ -427,11 +427,20 @@ def start_services():
  load('watcher');run('launchctl','kickstart',job('watcher'))
  run(APP,'--apply-wallpaper',check=False)
 
+def omac_config(path,expected=None):
+ expected=expected or RUNTIME/'config/aerospace.toml'
+ if path==str(expected): return True
+ if not path or status()!='Active' or not (STATE/'aerospace.enabled').exists(): return False
+ try: text=Path(path).read_text()
+ except (OSError,ValueError): return False
+ markers=("persistent-workspaces = ['1', '2', '3', '4', '5']",'[mode.active.binding]','control.py','recover')
+ return all(marker in text for marker in markers)
+
 def enter(count=0,add=False):
  existing=aero('config','--config-path',check=False)
- if existing and existing!=str(RUNTIME/'config/aerospace.toml'):
+ if existing and not omac_config(existing):
   raise RuntimeError('Another AeroSpace configuration is active. Exit it before entering Omac.')
- active=existing==str(RUNTIME/'config/aerospace.toml') and (STATE/'status').exists() and (STATE/'status').read_text()=='Active'
+ active=omac_config(existing) and status()=='Active'
  if not active:
   run(APP,'--snapshot')
   (STATE/'aerospace.enabled').touch()
@@ -439,7 +448,7 @@ def enter(count=0,add=False):
   run('launchctl','kickstart',job('aerospace'))
  try:
   if not active: ready()
-  if aero('config','--config-path')!=str(RUNTIME/'config/aerospace.toml'):
+  if not omac_config(aero('config','--config-path')):
    raise RuntimeError('A different AeroSpace instance is running.')
   if not active:
    aero('reload-config')
