@@ -86,6 +86,11 @@ public final class AppShelf {
         pruneStaleRecords()
         var failures: [Error] = []
         for record in records.values {
+            let prepared = process(python ?? "/missing/python3", [root + "/control.py", "prepare-mixed-tuck", "--window-id", String(record.entry.windowID), "--app-pid", String(record.entry.appPID)])
+            if prepared.0 != 0 { failures.append(ShelfError.unavailable(prepared.1)) }
+        }
+        if let failure = failures.first { throw ShelfError.unavailable("Could not prepare shelf windows: \(failure)") }
+        for record in records.values {
             do {
                 try validateRecord(record)
                 guard AXUIElementSetAttributeValue(record.element, kAXMinimizedAttribute as CFString, kCFBooleanTrue) == .success else { throw ShelfError.geometry }

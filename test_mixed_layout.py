@@ -120,6 +120,60 @@ class MixedLayout(unittest.TestCase):
        patch.object(c,'windows',return_value=moved),patch.object(c,'_restore_mixed_members') as restore:
    with self.assertRaisesRegex(RuntimeError,'identity or page changed'):c.restore_mixed()
    restore.assert_not_called()
+ def test_switch_page_restores_before_switching(self):
+  self.checkpoint();events=[]
+  def restore(data):events.append('restore')
+  def aero(*args,**kwargs):
+   if args[:2]==('list-workspaces','--focused'):return '2'
+   events.append(('aero',args));return ''
+  with patch.object(c,'_restore_mixed_data',side_effect=restore),patch.object(c,'aero',side_effect=aero):
+   c.switch_page('3')
+  self.assertEqual(events,['restore',('aero',('workspace','3'))])
+ def test_switch_page_restore_failure_prevents_switch(self):
+  self.checkpoint()
+  with patch.object(c,'_restore_mixed_data',side_effect=RuntimeError('restore failed')),patch.object(c,'aero',return_value='2') as aero:
+   with self.assertRaisesRegex(RuntimeError,'restore failed'):c.switch_page('3')
+  self.assertEqual(aero.call_args_list,[unittest.mock.call('list-workspaces','--focused')])
+ def test_switch_page_refuses_stale_external_page_checkpoint(self):
+  self.checkpoint()
+  with patch.object(c,'aero',return_value='5') as aero,patch.object(c,'_restore_mixed_data') as restore:
+   with self.assertRaisesRegex(RuntimeError,'recorded on page 2'):c.switch_page('3')
+  restore.assert_not_called();self.assertEqual(len(aero.call_args_list),1)
+ def test_switch_page_allows_return_to_stale_checkpoint_page_without_restore(self):
+  self.checkpoint()
+  with patch.object(c,'aero',side_effect=['5','']) as aero,patch.object(c,'_restore_mixed_data') as restore:
+   c.switch_page('2')
+  restore.assert_not_called();self.assertTrue((c.STATE/'mixed-layout.json').exists())
+  self.assertEqual(aero.call_args_list[-1].args,('workspace','2'))
+ def test_move_member_restores_before_move(self):
+  self.checkpoint();events=[]
+  def restore(data):events.append('restore')
+  def aero(*args,**kwargs):
+   if args[0]=='list-windows':return json.dumps([self.app])
+   events.append(args);return ''
+  with patch.object(c,'_restore_mixed_data',side_effect=restore),patch.object(c,'aero',side_effect=aero):c.move_focused_to_page('4')
+  self.assertEqual(events,['restore',('move-node-to-workspace','--window-id','10','4')])
+ def test_move_member_restore_failure_prevents_move(self):
+  self.checkpoint()
+  with patch.object(c,'_restore_mixed_data',side_effect=RuntimeError('restore failed')),patch.object(c,'aero',return_value=json.dumps([self.app])) as aero:
+   with self.assertRaisesRegex(RuntimeError,'restore failed'):c.move_focused_to_page('4')
+  self.assertEqual(len(aero.call_args_list),1)
+ def test_move_member_to_current_page_is_noop_and_keeps_mixed(self):
+  self.checkpoint()
+  with patch.object(c,'aero',return_value=json.dumps([self.app])) as aero,patch.object(c,'_restore_mixed_data') as restore:
+   self.assertIn('already',c.move_focused_to_page('2'))
+  restore.assert_not_called();self.assertEqual(len(aero.call_args_list),1);self.assertTrue((c.STATE/'mixed-layout.json').exists())
+ def test_prepare_tuck_restores_visible_member_and_nonmember_noops(self):
+  self.checkpoint()
+  with patch.object(c,'aero',return_value='2'),patch.object(c,'_restore_mixed_data') as restore:
+   self.assertIn('restored before tucking',c.prepare_mixed_tuck(10,110));restore.assert_called_once()
+  with patch.object(c,'aero') as aero,patch.object(c,'_restore_mixed_data') as restore:
+   self.assertIn('not part',c.prepare_mixed_tuck(999,999));aero.assert_not_called();restore.assert_not_called()
+ def test_prepare_tuck_off_checkpoint_page_refuses_before_restore(self):
+  self.checkpoint()
+  with patch.object(c,'aero',return_value='5'),patch.object(c,'_restore_mixed_data') as restore:
+   with self.assertRaisesRegex(RuntimeError,'Return there'):c.prepare_mixed_tuck(10,110)
+  restore.assert_not_called()
  def test_tile_mutations_are_refused_on_active_mixed_page(self):
   self.checkpoint()
   with patch.object(c,'boot_session',return_value='boot'),patch.object(c,'page',return_value='2'),patch.object(c,'aero') as aero:

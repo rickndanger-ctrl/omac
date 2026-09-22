@@ -139,3 +139,6 @@ Compiled the committed portable shelf launcher, backed up the remote app and run
 - Matching signed helper installed/running on both Macs. Mini 1 menu visibly exposes all six size/count combinations. Mini 2 physical test is deferred at the user's request.
 - Ghostty hidden mode configured for new Omac terminals. Existing terminal reload remains pending: CUA access to Ghostty was rejected; do not bypass that boundary or restart user sessions. Automatic macOS keyboard-layout switching is disabled by Ghostty hidden mode.
 - Optional additional app windows remain an uninstalled prototype, deferred by the user.
+
+- Follow-up page/shelf correction: restore mixed layout before Omac page switching, moving a member, or manual shelf tuck. Real page 1 → 2 → 1 test passed using an isolated checkpoint; original real-window frames and production checkpoint remained intact. External page changes retain recovery state and allow returning to its recorded page.
+- Tighter yellow border compiled and installed on both Macs; visual corner acceptance remains user-visible validation.

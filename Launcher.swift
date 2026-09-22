@@ -512,7 +512,6 @@ class Delegate: NSObject,NSApplicationDelegate {
 
   if let text=event.paramDescriptor(forKeyword:AEKeyword(keyDirectObject))?.stringValue, let action=URL(string:text)?.host, ["exit","pause","enter","four","six","new","guide","menu","center","rescue","refocus","cycle-next","cycle-previous","shelf","shelf-add","shelf-tuck","place-left","place-right"].contains(action) {perform(action)}
  }
- @objc func selectPage(_ sender:NSMenuItem) { guard (try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8))=="Active" else{return};DispatchQueue.global().async {_=process(aerospace ?? "/missing/aerospace",["workspace",String(sender.tag)]);DispatchQueue.main.async{self.refreshBar()}} }
  @objc func showThemedMenu(_ sender:Any?) {
   if menuPanel.isVisible {menuPanel.dismiss();return}
   guide?.orderOut(nil);shelfPanel.orderOut(nil)
@@ -586,6 +585,16 @@ class Delegate: NSObject,NSApplicationDelegate {
   guard remaining>0 else{return}
   DispatchQueue.main.asyncAfter(deadline:.now()+0.2) { [weak self] in
    self?.retryShelfLaunch(bundle:bundle,app:app,launchID:launchID,page:page,previousPID:previousPID,remaining:remaining-1,sawRequestedApp:sawRequestedApp,openedFinderHome:openedFinderHome)
+  }
+ }
+ @objc func selectPage(_ sender:NSMenuItem) {
+  guard (try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8))=="Active" else {return}
+  DispatchQueue.global().async {
+   let result=process(python ?? "/missing/python3",[root+"/control.py","switch-page",String(sender.tag)])
+   DispatchQueue.main.async {
+    self.refreshBar()
+    if result.0 != 0 {let alert=NSAlert();alert.messageText="Omac could not switch pages";alert.informativeText=result.1;NSApp.activate(ignoringOtherApps:true);alert.runModal()}
+   }
   }
  }
  @objc func selectWallpaper(_ sender:NSMenuItem) {

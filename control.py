@@ -151,6 +151,38 @@ def _restore_mixed_members(members):
    aero('layout','--window-id',str(window['window-id']),member['original-layout'])
   except Exception as exc: errors.append(f"{window.get('window-id')}: {exc}")
  return errors
+def _validate_mixed_members(data):
+ if data.get('boot')!=boot_session(): raise RuntimeError('Mixed layout belongs to an earlier boot and cannot be restored safely.')
+ workspace=data.get('workspace');live={w['window-id']:w for w in windows()}
+ for member in data.get('members',[]):
+  current=live.get(member.get('window-id'))
+  if not current or current.get('app-pid')!=member.get('app-pid') or current.get('workspace')!=workspace:
+   raise RuntimeError('Mixed layout member identity or page changed; restore refused.')
+ return workspace
+def _verify_restored_members(members,workspace):
+ live={w['window-id']:w for w in windows()};errors=[]
+ for member in members:
+  current=live.get(member.get('window-id'));original=member.get('original-layout')
+  if not current or current.get('app-pid')!=member.get('app-pid') or current.get('workspace')!=workspace:
+   errors.append(f"{member.get('window-id')}: identity or page changed after restore");continue
+  actual=current.get('window-layout')
+  valid=actual==original or (original=='tiling' and actual in ('h_tiles','v_tiles'))
+  if not valid: errors.append(f"{member.get('window-id')}: layout is {actual}, expected {original}");continue
+  if original=='floating':
+   try:
+    frame=_native_target(current)['frame']
+    if not _same_frame(frame,member.get('original-frame')): errors.append(f"{member.get('window-id')}: floating frame did not restore")
+   except Exception as exc: errors.append(f"{member.get('window-id')}: frame verification failed: {exc}")
+ return errors
+def _restore_mixed_data(data):
+ workspace=_validate_mixed_members(data);members=data.get('members',[])
+ errors=_restore_mixed_members(members)
+ if not errors: errors=_verify_restored_members(members,workspace)
+ if errors:
+  data['state']='recovery-required';data['rollback-errors']=errors;_write_mixed(data)
+  raise RuntimeError('Mixed layout restore incomplete: '+'; '.join(errors))
+ _mixed_path().unlink(missing_ok=True)
+ return workspace
 def apply_mixed(count,app_side='left',app_width='1/2',selected_identity=None):
  if count not in (2,3): raise RuntimeError('Mixed layout requires two or three terminals.')
  if _read_mixed(): raise RuntimeError('Restore the current mixed layout before applying another.')
@@ -201,18 +233,42 @@ def apply_mixed(count,app_side='left',app_width='1/2',selected_identity=None):
 def restore_mixed():
  data=_read_mixed()
  if not data: return 'No mixed layout is active.'
- if data.get('boot')!=boot_session(): raise RuntimeError('Mixed layout belongs to an earlier boot and cannot be restored safely.')
  workspace=data.get('workspace')
  if workspace!=page(): raise RuntimeError('Switch to the mixed layout page before restoring it.')
- live={w['window-id']:w for w in windows()}
- for member in data.get('members',[]):
-  current=live.get(member.get('window-id'))
-  if not current or current.get('app-pid')!=member.get('app-pid') or current.get('workspace')!=workspace:
-   raise RuntimeError('Mixed layout member identity or page changed; restore refused.')
- errors=_restore_mixed_members(data.get('members',[]))
- if errors: raise RuntimeError('Mixed layout restore incomplete: '+'; '.join(errors))
- _mixed_path().unlink(missing_ok=True)
+ _restore_mixed_data(data)
  return 'Mixed layout restored.'
+def switch_page(target):
+ if target not in ('1','2','3','4','5'): raise RuntimeError('Page must be 1 through 5.')
+ current=aero('list-workspaces','--focused').strip();data=_read_mixed()
+ if data and target!=current:
+  if data.get('workspace')!=current:
+   if target!=data.get('workspace'): raise RuntimeError(f"Mixed layout is still recorded on page {data.get('workspace')}. Return there and restore it before switching pages.")
+  else:_restore_mixed_data(data)
+ aero('workspace',target)
+ return f'Switched to page {target}.'
+def move_focused_to_page(target):
+ if target not in ('1','2','3','4','5'): raise RuntimeError('Page must be 1 through 5.')
+ focused=json.loads(aero('list-windows','--focused','--format','%{window-id} %{app-pid} %{workspace}','--json'))
+ if not focused: raise RuntimeError('Focus a window first.')
+ window=focused[0];data=_read_mixed()
+ if target==window.get('workspace'):return f'Focused window is already on page {target}.'
+ if data:
+  member=next((item for item in data.get('members',[]) if item.get('window-id')==window.get('window-id') and item.get('app-pid')==window.get('app-pid')),None)
+  if member:
+   if window.get('workspace')!=data.get('workspace'): raise RuntimeError('Mixed window already left its recorded page; move refused.')
+   _restore_mixed_data(data)
+ aero('move-node-to-workspace','--window-id',str(window['window-id']),target)
+ return f'Moved focused window to page {target}.'
+def prepare_mixed_tuck(window_id,app_pid):
+ data=_read_mixed()
+ if not data:return 'Window is not part of an active mixed layout.'
+ member=next((item for item in data.get('members',[]) if item.get('window-id')==window_id and item.get('app-pid')==app_pid),None)
+ if not member:return 'Window is not part of the active mixed layout.'
+ current=aero('list-workspaces','--focused').strip()
+ if current!=data.get('workspace'):
+  raise RuntimeError(f"Mixed layout is recorded on page {data.get('workspace')}. Return there and restore it before tucking this app.")
+ _restore_mixed_data(data)
+ return 'Mixed layout restored before tucking its app window.'
 def _center(frame): return frame[0]+frame[2]/2,frame[1]+frame[3]/2
 def focus_direction(direction):
  if direction not in ('left','right','up','down'): raise RuntimeError('Direction must be left, right, up, or down.')
@@ -485,6 +541,15 @@ def main():
    widths={'third':'1/3','half':'1/2','two-thirds':'2/3'}
    print(apply_mixed(int(parts[1]),app_width=widths[parts[2]],selected_identity=selected_identity))
   elif action=='mixed-restore': print(restore_mixed())
+  elif action=='switch-page':
+   if len(sys.argv)<3: raise RuntimeError('switch-page requires a page number.')
+   print(switch_page(sys.argv[2]))
+  elif action=='move-focused-page':
+   if len(sys.argv)<3: raise RuntimeError('move-focused-page requires a page number.')
+   print(move_focused_to_page(sys.argv[2]))
+  elif action=='prepare-mixed-tuck':
+   if not selected_identity: raise RuntimeError('prepare-mixed-tuck requires an exact window ID and app PID.')
+   print(prepare_mixed_tuck(*selected_identity))
   elif action=='focus-direction':
    if len(sys.argv)<3: raise RuntimeError('Usage: control.py focus-direction <left|right|up|down>')
    print(focus_direction(sys.argv[2]))
