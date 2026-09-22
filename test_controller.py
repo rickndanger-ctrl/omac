@@ -23,22 +23,37 @@ class Lifecycle(unittest.TestCase):
    self.assertFalse(any(call.args[0]=='reload-config' for call in aero.call_args_list))
  def test_new_terminal_keeps_origin_and_existing_layout(self):
   c.save_status('Active')
-  launched=[False]
-  old={'window-id':1,'window-title':'ACC · 1','workspace':'2'}
-  new={'window-id':2,'window-title':'ACC · 2','workspace':'2'}
+  old={'window-id':1,'window-title':'ACC · 1','workspace':'2','app-pid':123}
   def aero(*args,**kwargs):
    if args[:2]==('config','--config-path'): return str(c.RUNTIME/'config/aerospace.toml')
    if args[:2]==('list-workspaces','--focused'): return '2'
    return ''
-  def terminals(workspace=None): return [old,new] if launched[0] else [old]
-  def run(*args,**kwargs):
-   if args[:2]==('launchctl','kickstart'): launched[0]=True
-   return ''
-  with patch.object(c,'aero',side_effect=aero) as commands,patch.object(c,'run',side_effect=run),patch.object(c,'load'),patch.object(c,'job_running',return_value=False),patch.object(c,'terminal_windows',side_effect=terminals),patch.object(c,'arrange') as arrange,patch.object(c,'start_services') as services:
+  with patch.object(c,'aero',side_effect=aero),patch.object(c,'run') as run,patch.object(c,'terminal_windows',return_value=[old]),patch.object(c,'add_window_to_existing_terminal',return_value=2) as create,patch.object(c,'arrange') as arrange,patch.object(c,'start_services') as services:
    self.assertIn('2 plain',c.enter(add=True))
    arrange.assert_not_called();services.assert_not_called()
-   commands.assert_any_call('workspace','2')
-   commands.assert_any_call('focus','--window-id','2')
+   create.assert_called_once_with([old],'2')
+   run.assert_not_called()
+ def test_existing_process_creates_window_without_page_switch(self):
+  old={'window-id':1,'window-title':'ACC · 1','workspace':'2','app-pid':123}
+  new={'window-id':2,'window-title':'ACC · 1','workspace':'2','app-pid':123}
+  with patch.object(c,'windows',side_effect=[[old],[old,new]]),patch.object(c,'run') as run,patch.object(c,'aero') as aero,patch.object(c,'terminal_windows',return_value=[old,new]):
+   self.assertEqual(c.add_window_to_existing_terminal([old],'2'),2)
+   self.assertEqual(run.call_args.args[:2],('osascript','-e'))
+   aero.assert_any_call('layout','--window-id','2','tiling')
+   aero.assert_any_call('focus','--window-id','2')
+   self.assertFalse(any(call.args[0]=='workspace' for call in aero.call_args_list))
+ def test_empty_page_reuses_terminal_from_another_page(self):
+  c.save_status('Active')
+  remote={'window-id':1,'window-title':'ACC · 1','workspace':'1','app-pid':123}
+  def aero(*args,**kwargs):
+   if args[:2]==('config','--config-path'): return str(c.RUNTIME/'config/aerospace.toml')
+   if args[:2]==('list-workspaces','--focused'): return '2'
+   return ''
+  def terminals(workspace=None): return [] if workspace=='2' else [remote]
+  with patch.object(c,'aero',side_effect=aero),patch.object(c,'terminal_windows',side_effect=terminals),patch.object(c,'add_window_to_existing_terminal',return_value=1) as create,patch.object(c,'run') as run:
+   self.assertIn('1 plain',c.enter(add=True))
+   create.assert_called_once_with([remote],'2')
+   run.assert_not_called()
  def test_grid_reset_is_one_batch_and_preserves_focus(self):
   tiles=[{'window-id':i,'window-title':'ACC · '+str(i)} for i in range(1,7)]
   cursor=['3']

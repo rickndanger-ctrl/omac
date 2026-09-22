@@ -399,6 +399,31 @@ def terminal_windows(workspace=None):
     result.append(dict(w,**{'window-title':canonical})); break
  return sorted(result,key=lambda w:(w['window-title'],w['window-id']))
 
+def add_window_to_existing_terminal(current, workspace):
+ # A fresh Ghostty process briefly activates its last-used workspace before
+ # AeroSpace can move the new window. File > New Window in a process already
+ # on this page creates the window directly here instead.
+ target=current[-1]
+ before={w['window-id'] for w in windows()}
+ pid=int(target['app-pid'])
+ script=(f'tell application "System Events"\n'
+         f' tell (first process whose unix id is {pid})\n'
+         ' click menu item "New Window" of menu 1 of menu bar item "File" of menu bar 1\n'
+         ' end tell\nend tell')
+ run('osascript','-e',script)
+ added=[]
+ for _ in range(40):
+  added=[w for w in windows() if w['window-id'] not in before and w.get('app-pid')==pid]
+  if added: break
+  time.sleep(.1)
+ if not added: raise RuntimeError('Ghostty did not create a window on this page.')
+ new=added[-1]
+ wid=str(new['window-id'])
+ if new.get('workspace')!=workspace: aero('move-node-to-workspace','--window-id',wid,workspace)
+ aero('layout','--window-id',wid,'tiling')
+ aero('focus','--window-id',wid)
+ return len(terminal_windows(workspace))
+
 def arrange(workspace=None):
  workspace=workspace or page()
  tiles=terminal_windows(workspace)
@@ -464,6 +489,14 @@ def enter(count=0,add=False):
   workspace=origin or page()
   current=terminal_windows(workspace)
   if add: count=min(6,len(current)+1)
+  if add and active and len(current)<6:
+   # A window in another workspace can also create a new window on the
+   # currently focused page without switching to its own page.
+   source=current or terminal_windows()
+   if source:
+    total=add_window_to_existing_terminal(source,workspace)
+    save_pages()
+    return f'{total} plain terminal windows tiled. No agents launched.'
   present={w['window-title'] for w in terminal_windows()}
   needed=max(0,count-len(current))
   expected=set(present)
@@ -509,7 +542,7 @@ def enter(count=0,add=False):
   if not active: start_services()
   return f'{total} plain terminal windows tiled. No agents launched.'
  except Exception:
-  stop(True)
+  if not (add and active): stop(True)
   raise
 
 def login():
