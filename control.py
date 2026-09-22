@@ -66,7 +66,7 @@ def restore_pages():
  except (ValueError,OSError): return
  if data.get('boot')!=boot_session(): return
  live={w['window-id']:w for w in windows()}
- commands=[]
+ warnings=[]
  for w in data['windows']:
   if not isinstance(w,dict) or not isinstance(w.get('window-id'),int): continue
   if is_remote_viewer(w): continue
@@ -79,19 +79,17 @@ def restore_pages():
   current_layout=current.get('window-layout')
   if current_layout in ('macos_native_window_of_hidden_app','macos_fullscreen'): continue
   if current.get('workspace')!=target:
-   commands.append(f"move-node-to-workspace --window-id {w['window-id']} {target}")
+   try: aero('move-node-to-workspace','--window-id',str(w['window-id']),target)
+   except RuntimeError as exc:
+    warnings.append(f"Window {w['window-id']} could not return to page {target}: {exc}")
+    continue
   recorded=w.get('window-layout')
-  if recorded=='floating' and current_layout!='floating':
-   commands.append(f"layout --window-id {w['window-id']} floating")
-  elif recorded in ('h_tiles','v_tiles','tiles','tiling') and current_layout=='floating':
-   commands.append(f"layout --window-id {w['window-id']} h_tiles")
- if commands:
-  aero('eval','; '.join(commands))
-  for workspace in ('1','2','3','4','5'):
-   saved=[w for w in data['windows'] if isinstance(w,dict) and w.get('workspace')==workspace]
-   terminals=[w for w in saved if w.get('app-name')=='Ghostty']
-   if len(terminals)>=3 and all(w.get('window-layout')!='floating' for w in terminals) and all(w.get('app-name')=='Ghostty' or w.get('window-layout') in ('floating','macos_native_window_of_hidden_app','macos_fullscreen') for w in saved):
-    arrange(workspace)
+  desired='floating' if recorded=='floating' and current_layout!='floating' else (
+   'tiling' if recorded in ('h_tiles','v_tiles','tiles','tiling') and current_layout=='floating' else None)
+  if desired:
+   try: aero('layout','--window-id',str(w['window-id']),desired)
+   except RuntimeError as exc: warnings.append(f"Window {w['window-id']} layout was left as-is: {exc}")
+ if warnings: (STATE/'recovery-warnings.log').write_text('\n'.join(warnings)+'\n')
  target=data.get('page','1')
  aero('workspace',target if target in ('1','2','3','4','5') else '1')
 def migrate_pages():

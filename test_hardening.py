@@ -20,6 +20,19 @@ class Hardening(unittest.TestCase):
   with patch.object(c,'boot_session',return_value='same'),patch.object(c,'windows',return_value=live),patch.object(c,'aero') as aero:
    c.restore_pages()
   self.assertEqual([call.args for call in aero.call_args_list],[('workspace','1')])
+ def test_restore_failure_does_not_disable_omac(self):
+  saved=[{'window-id':7,'app-pid':70,'workspace':'1','app-name':'Ghostty','window-layout':'h_tiles'}]
+  live=[dict(saved[0],**{'workspace':'6','window-layout':'floating'})]
+  (c.STATE/'pages.json').write_text(json.dumps({'boot':'same','page':'1','windows':saved}))
+  calls=[]
+  def aero(*args):
+   calls.append(args)
+   if args[0]=='layout': raise RuntimeError('The window is non-tiling')
+  with patch.object(c,'boot_session',return_value='same'),patch.object(c,'windows',return_value=live),patch.object(c,'aero',side_effect=aero):
+   c.restore_pages()
+  self.assertIn(('move-node-to-workspace','--window-id','7','1'),calls)
+  self.assertIn(('workspace','1'),calls)
+  self.assertIn('non-tiling',(c.STATE/'recovery-warnings.log').read_text())
  def test_same_page_tiles_and_hidden_app_do_not_trigger_rearrange(self):
   rows=[{'window-id':i,'app-pid':i,'workspace':'1','app-name':'Ghostty','window-layout':'v_tiles'} for i in range(1,5)]
   rows.append({'window-id':9,'app-pid':9,'workspace':'1','app-name':'Messages','window-layout':'macos_native_window_of_hidden_app'})
