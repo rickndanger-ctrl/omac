@@ -13,6 +13,9 @@ class Portability(unittest.TestCase):
    self.assertEqual(sorted(x.name for x in payload.iterdir()),['generate_config.py','portable_paths.py'])
    config=tomllib.loads((state/'runtime/config/aerospace.toml').read_text())
    self.assertIn(str(payload/'control.py').replace("'","'\"'\"'"),config['after-startup-command'][0])
+   self.assertIn(str(payload/'control.py').replace("'","'\"'\"'"),config['mode']['active']['binding']['cmd-enter'])
+   self.assertTrue(config['mode']['active']['binding']['cmd-enter'].endswith(' new'))
+   self.assertNotIn('agent-control-center://new',config['mode']['active']['binding']['cmd-enter'])
    self.assertEqual(config['persistent-workspaces'],['1','2','3','4','5'])
    job=plistlib.loads((state/'runtime/launchd/menu.plist').read_bytes())
    self.assertEqual(job['ProgramArguments'],[app,'--managed'])
@@ -21,7 +24,7 @@ class Portability(unittest.TestCase):
    watcher=plistlib.loads((state/'runtime/launchd/watcher.plist').read_bytes())
    self.assertEqual(watcher['ProgramArguments'],[sys.executable,str(payload/'watcher.py')])
    terminal=plistlib.loads((state/'runtime/launchd/terminal.1.plist').read_bytes())
-   self.assertEqual(terminal['ProgramArguments'][:5],['/usr/bin/open','-g','-W','-n','-a'])
+   self.assertEqual(terminal['ProgramArguments'][:4],['/usr/bin/open','-W','-n','-a'])
    # No original checkout or user's account directory may leak into generated jobs.
    for file in (state/'runtime/launchd').glob('*.plist'):
     self.assertNotIn(str(source),file.read_text())

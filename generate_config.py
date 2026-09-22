@@ -85,7 +85,7 @@ cmd-shift-equal = 'exec-and-forget /opt/homebrew/bin/python3 "CONTROLLER" tile-c
 cmd-esc = "exec-and-forget open -g 'agent-control-center://rescue'"
 cmd-shift-esc = "exec-and-forget open -g 'agent-control-center://refocus'"
 cmd-alt-enter = 'exec-and-forget "/Applications/Omac.app/Contents/MacOS/AgentControlCenter" --shelf-action menu'
-cmd-enter = "exec-and-forget open -g 'agent-control-center://new'"
+cmd-enter = 'exec-and-forget /opt/homebrew/bin/python3 "CONTROLLER" new'
 ctrl-alt-4 = "exec-and-forget open -g 'agent-control-center://four'"
 ctrl-alt-6 = "exec-and-forget open -g 'agent-control-center://six'"
 ctrl-alt-esc = "exec-and-forget open -g 'agent-control-center://exit'"
@@ -151,6 +151,6 @@ for name,args,keep in [
  ('login',[app,'--login'],False),
  ('menu',[app,'--managed'],{'PathState':{str(s/'menu.enabled'):True}}),
  ('aerospace',[str(Path(AERO_APP)/'Contents/MacOS/AeroSpace'),'--config-path',str(RUNTIME/'config/aerospace.toml')],{'PathState':{str(s/'aerospace.enabled'):True}}),
- *[('terminal.'+role.lower(),['/usr/bin/open','-g','-W','-n','-a',GHOSTTY_APP,'--args','--title=Omac · '+role,'--config-file='+str(r/'config/ghostty.conf'),'--working-directory='+str(Path.home()/'Documents')],False) for role in [str(i) for i in range(1,31)]]]:
+ *[('terminal.'+role.lower(),['/usr/bin/open','-W','-n','-a',GHOSTTY_APP,'--args','--title=Omac · '+role,'--config-file='+str(r/'config/ghostty.conf'),'--working-directory='+str(Path.home()/'Documents')],False) for role in [str(i) for i in range(1,31)]]]:
  d={'Label':'com.richard.acc.'+name,'ProgramArguments':args,'RunAtLoad':name=='login','KeepAlive':keep,'ThrottleInterval':5,'EnvironmentVariables':env,'StandardOutPath':str(s/(name+'.log')),'StandardErrorPath':str(s/(name+'.error.log'))}
  (RUNTIME/'launchd'/f'{name}.plist').write_bytes(plistlib.dumps(d))

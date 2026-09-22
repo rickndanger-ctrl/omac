@@ -15,6 +15,9 @@ def run(*args,check=True):
  return p.stdout.strip()
 def aero(*args,check=True): return run(AERO,*args,check=check)
 def job(name): return DOMAIN+'/com.richard.acc.'+name
+def job_running(name):
+ p=subprocess.run(['launchctl','print',job(name)],capture_output=True,text=True)
+ return p.returncode==0 and 'state = running' in p.stdout
 
 def load(name):
  p=subprocess.run(['launchctl','print',job(name)],capture_output=True)
@@ -468,8 +471,12 @@ def enter(count=0,add=False):
    title='ACC · '+role
    if title in present: continue
    label='terminal.'+role; load(label)
+   # A supervised Ghostty process can exist before AeroSpace sees its window.
+   # Do not restart that process and risk ending an untracked shell session.
+   if job_running(label): continue
    run('launchctl','kickstart','-k',job(label),check=False)
    expected.add(title); needed-=1
+  if needed: raise RuntimeError('No idle terminal launch jobs are available.')
   for _ in range(60):
    if expected.issubset({w['window-title'] for w in terminal_windows()}): break
    time.sleep(.25)
