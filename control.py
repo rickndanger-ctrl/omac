@@ -272,6 +272,14 @@ def prepare_mixed_tuck(window_id,app_pid):
  _restore_mixed_data(data)
  return 'Mixed layout restored before tucking its app window.'
 def _center(frame): return frame[0]+frame[2]/2,frame[1]+frame[3]/2
+def center_or_enlarge(window_id,app_pid,layout):
+ if layout=='floating':
+  run(APP,'--center',str(app_pid))
+  aero('focus','--window-id',str(window_id))
+  return 'Floating window centered without changing the tile grid.'
+ aero('fullscreen','--window-id',str(window_id))
+ aero('focus','--window-id',str(window_id))
+ return 'Tile enlarged or restored without leaving the tile grid.'
 def focus_direction(direction):
  if direction not in ('left','right','up','down'): raise RuntimeError('Direction must be left, right, up, or down.')
  data=_read_mixed();workspace=page()
@@ -563,23 +571,8 @@ def main():
   elif action=='center':
    focused=json.loads(aero('list-windows','--focused','--format','%{window-id} %{app-pid} %{workspace} %{window-layout}','--json'))
    if not focused: raise RuntimeError('Focus a window first.')
-   wid=str(focused[0]['window-id'])
-   layout=aero('list-windows','--focused','--format','%{window-layout}')
-   if layout=='floating':
-    aero('layout','--window-id',wid,'tiling')
-    aero('balance-sizes','--workspace',page())
-    aero('focus','--window-id',wid)
-    print('Terminal returned to tiling.')
-   else:
-    pid=aero('list-windows','--focused','--format','%{app-pid}')
-    aero('fullscreen','off','--window-id',wid)
-    aero('layout','--window-id',wid,'floating')
-    try: run(APP,'--center',pid)
-    except Exception:
-     aero('layout','--window-id',wid,'tiling')
-     raise
-    aero('focus','--window-id',wid)
-    print('Terminal centered; Command-O returns it to tiling.')
+   window=focused[0]
+   print(center_or_enlarge(window['window-id'],window['app-pid'],window['window-layout']))
   elif action in ('pause','exit'): print(stop(action=='exit'))
   elif action=='status': print((STATE/'status').read_text() if (STATE/'status').exists() else 'Inactive')
   elif action=='rollback':
