@@ -496,6 +496,9 @@ class Delegate: NSObject,NSApplicationDelegate {
   for (title,value) in [("Emerald Glass","emerald-glass"),("Storm Forge","storm-forge"),("Crimson Etch","crimson-etch"),("Original Green Glass","obsidian"),("Amber Glass","amber"),("Silver Glass","pine")] {
    let entry=NSMenuItem(title:title,action:#selector(selectWallpaper(_:)),keyEquivalent:"");entry.representedObject=value;entry.target=self;appearanceMenu.addItem(entry)
   }
+  appearanceMenu.addItem(.separator())
+  let animatedWallpaper=NSMenuItem(title:"Animated Wallpaper",action:#selector(toggleAnimatedWallpaper(_:)),keyEquivalent:"")
+  animatedWallpaper.target=self;animatedWallpaper.state=wallpaperEnabled() ? .on:.off;appearanceMenu.addItem(animatedWallpaper)
   let saver=NSMenuItem(title:"Wallpaper & Screen Saver…",action:#selector(openSettings(_:)),keyEquivalent:"")
   saver.representedObject="x-apple.systempreferences:com.apple.Wallpaper-Settings.extension";saver.target=self;appearanceMenu.addItem(saver)
   appearance.submenu=appearanceMenu;menu.addItem(appearance)
@@ -512,6 +515,28 @@ class Delegate: NSObject,NSApplicationDelegate {
  }
  @objc func toggleFocusBorder(_ sender:NSMenuItem) {
   let enabled=sender.state != .on;focusBorder.setEnabled(enabled);sender.state=enabled ? .on:.off
+ }
+ func wallpaperEnabled()->Bool {
+  FileManager.default.fileExists(atPath:NSHomeDirectory()+"/Library/LaunchAgents/com.richard.omac.wallpaper.plist") &&
+   !FileManager.default.fileExists(atPath:state.appendingPathComponent("animated-wallpaper.disabled").path)
+ }
+ @objc func toggleAnimatedWallpaper(_ sender:NSMenuItem) {
+  let enable=sender.state != .on
+  let domain="gui/\(getuid())",label="com.richard.omac.wallpaper"
+  let plist=NSHomeDirectory()+"/Library/LaunchAgents/\(label).plist"
+  let marker=state.appendingPathComponent("animated-wallpaper.disabled")
+  if enable {
+   try? FileManager.default.removeItem(at:marker)
+   _=process("/bin/launchctl",["enable",domain+"/"+label])
+   let loaded=process("/bin/launchctl",["bootstrap",domain,plist])
+   if loaded.0 != 0 {_=process("/bin/launchctl",["kickstart","-k",domain+"/"+label])}
+   sender.state = .on
+  } else {
+   FileManager.default.createFile(atPath:marker.path,contents:Data())
+   _=process("/bin/launchctl",["disable",domain+"/"+label])
+   _=process("/bin/launchctl",["bootout",domain+"/"+label])
+   sender.state = .off
+  }
  }
  func applicationWillTerminate(_ notification:Notification) {focusBorder.setEngaged(false)}
  @objc func urlEvent(_ event:NSAppleEventDescriptor,reply:NSAppleEventDescriptor) {
