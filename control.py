@@ -1,6 +1,6 @@
 #!/opt/homebrew/bin/python3
 """On-demand controller. No API calls, credentials, or background polling."""
-import fcntl,json,math,os,plistlib,subprocess,sys,time
+import fcntl,json,math,os,plistlib,re,subprocess,sys,time
 from functools import lru_cache
 from pathlib import Path
 sys.dont_write_bytecode=True
@@ -430,6 +430,16 @@ def add_window_to_existing_terminal(current, workspace):
  aero('layout','--window-id',wid,'tiling')
  aero('focus','--window-id',wid)
  return len(terminal_windows(workspace))
+def running_terminal_source():
+ # launchctl reports the PID of /usr/bin/open, not its reparented Ghostty app.
+ # Resolve the actual app PID from the executable and this controller's config.
+ result=subprocess.run(['/bin/ps','-ww','-axo','pid=,command='],capture_output=True,text=True)
+ flag='--config-file='+str(ROOT/'config/ghostty.conf')
+ for line in result.stdout.splitlines():
+  match=re.match(r'\s*(\d+)\s+(\S+)(?:\s|$)',line)
+  if match and match.group(2).endswith('/ghostty') and flag in line and re.search(r'--title=(?:ACC|Omac) · (?:[1-9]|[12][0-9]|30)(?:\s|$)',line):
+   return [{'app-pid':int(match.group(1))}]
+ return []
 
 def arrange(workspace=None):
  workspace=workspace or page()
@@ -499,7 +509,7 @@ def enter(count=0,add=False):
   if add and active and len(current)<6:
    # A window in another workspace can also create a new window on the
    # currently focused page without switching to its own page.
-   source=current or terminal_windows()
+   source=current or terminal_windows() or running_terminal_source()
    if source:
     total=add_window_to_existing_terminal(source,workspace)
     save_pages()

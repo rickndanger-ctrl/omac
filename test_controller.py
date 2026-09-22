@@ -33,6 +33,24 @@ class Lifecycle(unittest.TestCase):
    arrange.assert_not_called();services.assert_not_called()
    create.assert_called_once_with([old],'2')
    run.assert_not_called()
+ def test_first_terminal_reuses_supervised_process_when_no_window_is_tracked(self):
+  c.save_status('Active')
+  source=[{'app-pid':4121}]
+  def aero(*args,**kwargs):
+   if args[:2]==('config','--config-path'): return str(c.RUNTIME/'config/aerospace.toml')
+   if args[:2]==('list-workspaces','--focused'): return '3'
+   return ''
+  with patch.object(c,'aero',side_effect=aero),patch.object(c,'run') as run,patch.object(c,'terminal_windows',return_value=[]),patch.object(c,'running_terminal_source',return_value=source) as find,patch.object(c,'add_window_to_existing_terminal',return_value=1) as create:
+   self.assertIn('1 plain',c.enter(add=True))
+  find.assert_called_once_with()
+  create.assert_called_once_with(source,'3')
+  self.assertFalse(any('terminal.' in str(item) for item in run.call_args_list))
+ def test_first_terminal_uses_ghostty_pid_not_open_wrapper(self):
+  from types import SimpleNamespace
+  config='--config-file='+str(c.ROOT/'config/ghostty.conf')
+  output=f'54702 /usr/bin/open -W -n -a /Applications/Ghostty.app\n54704 /Applications/Ghostty.app/Contents/MacOS/ghostty --title=ACC · 1 {config}\n'
+  with patch.object(c.subprocess,'run',return_value=SimpleNamespace(stdout=output)):
+   self.assertEqual(c.running_terminal_source(),[{'app-pid':54704}])
  def test_existing_process_creates_window_without_page_switch(self):
   old={'window-id':1,'window-title':'ACC · 1','workspace':'2','app-pid':123}
   new={'window-id':2,'window-title':'ACC · 1','workspace':'2','app-pid':123}
