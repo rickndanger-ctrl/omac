@@ -27,7 +27,7 @@ cp Info.plist "$app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c 'Add :LSMinimumSystemVersion string 14.0' "$app/Contents/Info.plist"
 cp branding/Omac.png "$app/Contents/Resources/Payload/branding/"
 cp branding/Omac.icns "$app/Contents/Resources/"
-cp tile_modes.py control.py watcher.py portable_paths.py generate_config.py Guide.html "$app/Contents/Resources/Payload/"
+cp tile_modes.py control.py watcher.py portable_paths.py generate_config.py mac_switch.py Guide.html "$app/Contents/Resources/Payload/"
 cp config/ghostty.conf "$app/Contents/Resources/Payload/config/"
 cp branding/wallpapers/omac-{obsidian,amber,pine,emerald-glass,storm-forge,crimson-etch}.png "$app/Contents/Resources/Payload/branding/wallpapers/"
 branding/screensaver/build.sh
