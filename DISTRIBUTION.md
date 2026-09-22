@@ -23,9 +23,9 @@ Each recipient must grant Omac and AeroSpace window-control access on their own 
 6. Direct distribution is the selected route: no App Store submission or Apple upload. Ad-hoc signing is local code integrity, not Developer ID trust. Test an actual quarantined downloaded copy and document supported macOS approval steps; never instruct users to disable Gatekeeper or other protections. Developer ID/notarization is optional future work only if explicitly chosen.
 7. Publish the signed DMG and checksum with release notes and rollback instructions. Add signed updates only after the installation/upgrade paths are reliable.
 
-## Independent distribution decision
+## Community distribution
 
-Omac is intended as a SaaS product with a direct-download Mac companion. Accounts, subscriptions and optional sync belong to the website; window control remains local. Nothing has been submitted to Apple. See SAAS-PLAN.md.
+Omac is a free community project distributed directly from its source and release artifacts. It does not require accounts, subscriptions, or a hosted service. Window control, terminal sessions, preferences, and the optional remote Screen Sharing setup all stay on the user's Mac. Nothing has been submitted to Apple.
 
 ## Reproducible build
 
@@ -38,12 +38,36 @@ Apple references:
 - Distribution signing: https://developer.apple.com/documentation/xcode/creating-distribution-signed-code-for-the-mac/
 - Notarization: https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution
 
-## Install on a tester Mac
+## Build, install, and update
 
-1. Install the prerequisites above. Open the DMG and run Install Omac.command. The installer checks prerequisites and preserves a backup before replacing files.
-2. Open Omac from Applications. macOS will require that Mac's own window-control approvals for Omac and AeroSpace.
-3. Use Open / Arrange 4 Terminals or 6 Terminals. Command–1 through 5 selects pages; Command–K opens help; Command–Option–Return opens the command menu.
-4. Start at Login is optional in the menu. Disengage restores ordinary window control while leaving terminal sessions running; Quit closes the menu helper.
-5. For an upgrade, choose Disengage and Quit first. Failed installation restores the previous app, Omac state and screensaver automatically. Backups remain under ~/Library/Application Support/Omac/InstallerBackups. Do not restore an old backup over an active session.
+1. On the build Mac, run `./package.sh`. It creates a signed engineering DMG and checksum without installing it or changing host services.
+2. On the destination Mac, install the prerequisites above, open the DMG, and run `Install Omac.command`. It verifies the staged app before replacing `/Applications/Omac.app`.
+3. For an update, choose Disengage and Quit first, then run the newer packaged installer. It preserves the Application Support state, including pages, wallpaper choice, app favorites, and optional remote-control configuration. It backs up the prior app, state, and saver under `~/Library/Application Support/Omac/InstallerBackups`; a failed install restores them automatically.
+4. Open Omac from Applications. macOS requires that Mac's own window-control approvals for Omac and AeroSpace. Start at Login remains opt-in.
+
+## Optional remote Screen Sharing handoff
+
+To enable Control–Option–1 (return local) and Control–Option–2 (enter remote), create `~/Library/Application Support/AgentControlCenter/remote-control.json` and then rerun the installed app with `--prepare-runtime` or install an update:
+
+```json
+{
+  "version": 1,
+  "enabled": true,
+  "connectionPath": "/Users/you/path/to/saved-connection.vncloc"
+}
+```
+
+The only required connection setting is `connectionPath`, an existing local Screen Sharing `.vncloc` file. Omac keeps the viewer on the page you enter from and does not ship a host name. Set `enabled` to `false`, remove the file, or regenerate the runtime to remove these bindings.
+
+If a host needs stable display placement, put this separate file beside the remote configuration and regenerate the runtime:
+
+```json
+{
+  "version": 1,
+  "workspaceToMonitor": { "1": "main", "4": "secondary" }
+}
+```
+
+Save it as `~/Library/Application Support/AgentControlCenter/preferred-monitor.json`. It generates AeroSpace's `workspace-to-monitor-force-assignment` only for valid page keys `"1"` through `"5"`. It is optional, stays outside the app bundle, and survives upgrades.
 
 The installer does not bypass macOS security checks. This preview is not yet the final download-and-go public product.

@@ -5,6 +5,24 @@ from portable_paths import SOURCE as r, STATE as s, RUNTIME, APP as app, PYTHON,
 (RUNTIME/'config').mkdir(parents=True,exist_ok=True)
 (RUNTIME/'launchd').mkdir(parents=True,exist_ok=True)
 s.mkdir(parents=True,exist_ok=True)
+REMOTE_CONFIG=s/'remote-control.json'
+MONITOR_CONFIG=s/'preferred-monitor.json'
+def remote_enabled():
+ try:
+  value=json.loads(REMOTE_CONFIG.read_text())
+ except (FileNotFoundError,OSError,ValueError):
+  return False
+ return (isinstance(value,dict) and value.get('version')==1 and value.get('enabled') is True
+         and isinstance(value.get('connectionPath'),str) and value['connectionPath'].strip())
+def preferred_monitors():
+ try:
+  value=json.loads(MONITOR_CONFIG.read_text())
+ except (FileNotFoundError,OSError,ValueError):
+  return {}
+ if not isinstance(value,dict) or value.get('version')!=1 or not isinstance(value.get('workspaceToMonitor'),dict):
+  return {}
+ return {str(page):monitor for page,monitor in value['workspaceToMonitor'].items()
+         if str(page) in {'1','2','3','4','5'} and isinstance(monitor,str) and monitor.strip()}
 config='''config-version = 2
 start-at-login = false
 after-startup-command = ['exec-and-forget /opt/homebrew/bin/python3 "CONTROLLER" recover']
@@ -93,6 +111,10 @@ if = 'test %{app-bundle-id} = com.richardholguin.omac.preview'
 run = 'layout floating'
 '''
 config=config.replace("open -g 'agent-control-center://", "open -g -a /Applications/Omac.app 'agent-control-center://")
+monitors=preferred_monitors()
+if monitors:
+ mapping='workspace-to-monitor-force-assignment = {'+', '.join(json.dumps(page)+' = '+json.dumps(monitor) for page,monitor in monitors.items())+'}'
+ config=config.replace("persistent-workspaces = ['1', '2', '3', '4', '5']", "persistent-workspaces = ['1', '2', '3', '4', '5']\n"+mapping)
 lines=config.splitlines()
 for i,line in enumerate(lines):
  if line.startswith('after-startup-command ='):
@@ -112,6 +134,15 @@ for i,line in enumerate(lines):
   lines[i]='cmd-k = '+json.dumps('exec-and-forget '+shlex.join([app,'--guide']))
  elif line.startswith('cmd-alt-enter ='):
   lines[i]='cmd-alt-enter = '+json.dumps('exec-and-forget "/Applications/Omac.app/Contents/MacOS/AgentControlCenter" --shelf-action menu')
+if remote_enabled():
+ remote_command='exec-and-forget '+shlex.join([PYTHON,str(r/'mac_switch.py')])
+ remote_bindings=[
+  'ctrl-alt-1 = '+json.dumps(remote_command+' local'),
+  'ctrl-alt-2 = '+json.dumps(remote_command+' remote'),
+ ]
+ for mode in ('[mode.main.binding]','[mode.active.binding]'):
+  index=lines.index(mode)+1
+  lines[index:index]=remote_bindings
 (RUNTIME/'config/aerospace.toml').write_text('\n'.join(lines)+'\n')
 env={'PATH':str(Path.home()/'.local/bin')+':/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin'}
 env.update({'PYTHONDONTWRITEBYTECODE':'1','OMAC_APP_EXECUTABLE':app,'OMAC_STATE_ROOT':str(s),'OMAC_AEROSPACE_CLI':AERO})
