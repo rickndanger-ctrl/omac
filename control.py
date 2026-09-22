@@ -9,6 +9,7 @@ STATE.mkdir(parents=True,exist_ok=True)
 DOMAIN=f'gui/{os.getuid()}'
 REMOTE_VIEWER_APP='Screen Sharing'
 REMOTE_VIEWER_BUNDLE='com.apple.ScreenSharing'
+REMOTE_WORKSPACE='Omac-Remote'
 ROLES=[str(i) for i in range(1,31)]
 
 def run(*args,check=True):
@@ -52,7 +53,15 @@ def save_pages():
  if not current and path.exists():
   try:
    previous=json.loads(path.read_text())
-   if isinstance(previous,dict) and previous.get('boot')==boot_session() and previous.get('windows'): return False
+   if isinstance(previous,dict) and previous.get('boot')==boot_session() and isinstance(previous.get('windows'),list):
+    # A pre-viewer-fix snapshot may contain only Screen Sharing. It is not a
+    # useful page map and must not keep repopulating an otherwise empty page.
+    managed=[w for w in previous.get('windows',[]) if isinstance(w,dict) and not is_remote_viewer(w)]
+    if managed:
+     if len(managed)!=len(previous.get('windows',[])):
+      previous=dict(previous);previous['windows']=managed
+      temp=path.with_suffix('.tmp');temp.write_text(json.dumps(previous));temp.replace(path)
+     return False
   except (ValueError,OSError): pass
  data={'boot':boot_session(),'page':page(),'windows':current}
  temp=STATE/'pages.tmp';temp.write_text(json.dumps(data));temp.replace(path)
@@ -263,6 +272,12 @@ def switch_page(target):
   if data.get('workspace')!=current:
    if target!=data.get('workspace'): raise RuntimeError(f"Mixed layout is still recorded on page {data.get('workspace')}. Return there and restore it before switching pages.")
   else:_restore_mixed_data(data)
+ # An empty destination page would otherwise focus a parked Screen Sharing
+ # viewer as soon as AeroSpace activates that workspace.
+ if target!=current:
+  for window in windows():
+   if is_remote_viewer(window) and window.get('workspace')==target:
+    aero('move-node-to-workspace','--window-id',str(window['window-id']),REMOTE_WORKSPACE)
  aero('workspace',target)
  return f'Switched to page {target}.'
 def move_focused_to_page(target):

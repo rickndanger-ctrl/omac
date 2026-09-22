@@ -126,7 +126,7 @@ class MixedLayout(unittest.TestCase):
   def aero(*args,**kwargs):
    if args[:2]==('list-workspaces','--focused'):return '2'
    events.append(('aero',args));return ''
-  with patch.object(c,'_restore_mixed_data',side_effect=restore),patch.object(c,'aero',side_effect=aero):
+  with patch.object(c,'_restore_mixed_data',side_effect=restore),patch.object(c,'aero',side_effect=aero),patch.object(c,'windows',return_value=[]):
    c.switch_page('3')
   self.assertEqual(events,['restore',('aero',('workspace','3'))])
  def test_switch_page_restore_failure_prevents_switch(self):
@@ -141,7 +141,7 @@ class MixedLayout(unittest.TestCase):
   restore.assert_not_called();self.assertEqual(len(aero.call_args_list),1)
  def test_switch_page_allows_return_to_stale_checkpoint_page_without_restore(self):
   self.checkpoint()
-  with patch.object(c,'aero',side_effect=['5','']) as aero,patch.object(c,'_restore_mixed_data') as restore:
+  with patch.object(c,'aero',side_effect=['5','']) as aero,patch.object(c,'_restore_mixed_data') as restore,patch.object(c,'windows',return_value=[]):
    c.switch_page('2')
   restore.assert_not_called();self.assertTrue((c.STATE/'mixed-layout.json').exists())
   self.assertEqual(aero.call_args_list[-1].args,('workspace','2'))

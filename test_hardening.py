@@ -57,6 +57,14 @@ class Hardening(unittest.TestCase):
   with patch.object(c,'windows',return_value=[]),patch.object(c,'boot_session',return_value='same'):
    self.assertFalse(c.save_pages())
   self.assertEqual(json.loads((c.STATE/'pages.json').read_text()),previous)
+ def test_empty_inventory_discards_stale_viewer_only_page_map(self):
+  remote={'window-id':5418,'app-pid':82697,'app-name':'Screen Sharing','workspace':'1','window-layout':'floating'}
+  previous={'boot':'same','page':'1','windows':[remote]}
+  (c.STATE/'pages.json').write_text(json.dumps(previous))
+  with patch.object(c,'windows',return_value=[]),patch.object(c,'boot_session',return_value='same'),patch.object(c,'page',return_value='1'):
+   self.assertTrue(c.save_pages())
+  saved=json.loads((c.STATE/'pages.json').read_text())
+  self.assertEqual(saved['windows'],[])
  def test_new_boot_replaces_stale_empty_inventory_checkpoint(self):
   (c.STATE/'pages.json').write_text(json.dumps({'boot':'old','page':'1','windows':[{'window-id':1,'app-pid':2}]}))
   with patch.object(c,'windows',return_value=[]),patch.object(c,'boot_session',return_value='new'),patch.object(c,'page',return_value='1'):
