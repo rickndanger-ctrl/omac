@@ -1,14 +1,14 @@
-# Omac — native packaging preview
+# Omac
 
-This branch (`omac/native-packaging`) builds a portable engineering preview. The working daily-use installation remains on the original branch; no live migration has been performed. **Read [DISTRIBUTION.md](DISTRIBUTION.md) before sharing or installing this build.**
+Omac is a keyboard-first macOS workspace built around AeroSpace, Ghostty, native apps, persistent pages, an app shelf, focus highlighting, and optional animated wallpaper. This repository currently builds a portable engineering preview. The signed bundle has been installed and exercised on two development Macs; it is not notarized or production-certified. **Read [DISTRIBUTION.md](DISTRIBUTION.md) before sharing or installing a build.**
 
 ## Build
 
 Run `./package.sh`. It compiles an app, includes its resources and optional saver, runs tests, signs the bundles and creates a checksummed DMG. It neither installs nor notarizes. Move an existing `dist` aside before rebuilding. The script reuses the first available Apple Development identity unless `OMAC_SIGN_IDENTITY` is set explicitly; it falls back to an ad-hoc engineering build only when no development identity is available.
 
-The app uses its own bundled resources, generates configs in each user's Application Support folder, discovers standard Homebrew/Python installations and diagnoses missing dependencies. The menu's Start at Login controls use native SMAppService registration; this new registration path still needs an actual installed-app login test. launchd continues supervising the window manager and watcher.
+The app uses its own bundled resources, generates configs in each user's Application Support folder, discovers standard Homebrew/Python installations and diagnoses missing dependencies. The menu's Start at Login controls use native SMAppService registration; installed-app login registration has passed on the second development Mac, while reboot and sign-out/sign-in acceptance remain open. launchd continues supervising the window manager and watcher.
 
-Dependencies remain external: AeroSpace app/CLI, Ghostty and Python. The public-release path is documented with exact blockers in DISTRIBUTION.md. The legacy direct installer is disabled on this branch to protect the current installation.
+Dependencies remain external: AeroSpace app/CLI, Ghostty and Python. The public-release path is documented with exact blockers in DISTRIBUTION.md. The legacy source-checkout installer is disabled here; use the packaged `Install Omac.command` workflow.
 
 ## Controls
 
