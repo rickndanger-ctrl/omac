@@ -12,19 +12,22 @@ struct FocusBorderGeometry {
 
 private final class FocusBorderView: NSView {
     let accent = NSColor(calibratedRed: 1.0, green: 0.82, blue: 0.12, alpha: 1.0)
+    private let edgeInset: CGFloat = 4
 
     override var isOpaque: Bool { false }
 
     override func draw(_ dirtyRect: NSRect) {
         NSColor.clear.setFill()
         dirtyRect.fill()
-        let rect = bounds.insetBy(dx: 5, dy: 5)
-        let path = NSBezierPath(roundedRect: rect, xRadius: 8, yRadius: 8)
-        accent.withAlphaComponent(0.13).setStroke()
-        path.lineWidth = 7
+        // The panel extends four points beyond the AX frame, so this centerline
+        // lands exactly on the real window edge instead of hovering outside it.
+        let rect = bounds.insetBy(dx: edgeInset, dy: edgeInset)
+        let path = NSBezierPath(roundedRect: rect, xRadius: 6, yRadius: 6)
+        accent.withAlphaComponent(0.16).setStroke()
+        path.lineWidth = 4
         path.stroke()
-        accent.withAlphaComponent(0.68).setStroke()
-        path.lineWidth = 1.5
+        accent.withAlphaComponent(0.90).setStroke()
+        path.lineWidth = 1
         path.stroke()
     }
 }
@@ -180,7 +183,7 @@ final class FocusBorderController {
               let primaryTop = NSScreen.screens.first?.frame.maxY else {
             panel.orderOut(nil); return
         }
-        panel.setFrame(FocusBorderGeometry.appKitFrame(axFrame: frame, primaryScreenTop: primaryTop, outset: 6),
+        panel.setFrame(FocusBorderGeometry.appKitFrame(axFrame: frame, primaryScreenTop: primaryTop, outset: 4),
                        display: true)
         panel.orderFrontRegardless()
     }
