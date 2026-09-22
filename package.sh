@@ -8,8 +8,8 @@ if [[ -z "$identity" ]]; then
  identity="$(security find-identity -v -p codesigning | sed -n 's/.*"\(Apple Development:.*\)"/\1/p' | head -n 1)"
 fi
 identity="${identity:--}"
-version=1.2.3-preview
-build_number=123
+version=1.2.4-preview
+build_number=124
 source_commit="$(git rev-parse HEAD)"
 arch="$(uname -m)"
 out="$PWD/dist"
