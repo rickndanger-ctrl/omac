@@ -400,8 +400,15 @@ class Delegate: NSObject,NSApplicationDelegate {
    if action=="shelf-add" {try shelf.addFocusedWindow();shelfPage=currentShelfPage();refreshShelf()}
    if action=="shelf-tuck" {try shelf.tuckAll()}
    if action=="shelf" {
-    shelfPanel.onChoose={[weak self] id in self?.summonShelf(id)}
-    shelfPanel.present(shelf.entries.map{ShelfChoice(windowID:$0.windowID,appName:$0.appName,windowTitle:$0.windowTitle,icon:$0.icon)})
+    shelfPanel.onChoose={[weak self] choice in
+     guard let self else{return}
+     if let bundle=choice.bundleIdentifier {self.launchShelfApp(bundle);return}
+     if let id=choice.windowID {self.summonShelf(id)}
+    }
+    let entries=shelf.entries
+    let bundles=Set(entries.compactMap(\.bundleIdentifier))
+    let tucked=entries.map{ShelfChoice(windowID:$0.windowID,bundleIdentifier:$0.bundleIdentifier,appName:$0.appName,windowTitle:$0.windowTitle,icon:$0.icon)}
+    shelfPanel.present(tucked + omacRunningAppChoices(excluding:bundles))
    }
   } catch {shelfError(error)}
  }

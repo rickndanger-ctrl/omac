@@ -1,7 +1,8 @@
 import Cocoa
 
 struct ShelfChoice {
-    let windowID: CGWindowID
+    let windowID: CGWindowID?
+    let bundleIdentifier: String?
     let appName: String
     let windowTitle: String
     let icon: NSImage?
@@ -12,7 +13,7 @@ final class ShelfPanel: NSPanel {
     private var choices: [ShelfChoice] = []
     private var selected = 0
     private var rows: [NSButton] = []
-    var onChoose: ((CGWindowID) -> Void)?
+    var onChoose: ((ShelfChoice) -> Void)?
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 
@@ -68,7 +69,7 @@ final class ShelfPanel: NSPanel {
     @objc private func chooseRow(_ sender: NSButton) { selected = sender.tag; choose() }
     private func choose() {
         guard choices.indices.contains(selected) else { return }
-        let id = choices[selected].windowID; orderOut(nil); onChoose?(id)
+        let choice = choices[selected]; orderOut(nil); onChoose?(choice)
     }
     override func keyDown(with event: NSEvent) {
         switch event.keyCode {
@@ -80,6 +81,26 @@ final class ShelfPanel: NSPanel {
         }
     }
     override func cancelOperation(_ sender: Any?) { orderOut(nil) }
+}
+
+/// One quick-select entry per running native app. Terminal processes and Omac's
+/// own infrastructure stay out of this list even when macOS shows them elsewhere.
+func omacRunningAppChoices(excluding excluded: Set<String> = []) -> [ShelfChoice] {
+    let ignored: Set<String> = [
+        "com.richard.agentcontrolcenter", "com.richardholguin.omac.wallpaper",
+        "com.apple.ScreenSharing", "com.mitchellh.ghostty", "com.apple.Terminal",
+        "com.googlecode.iterm2", "com.github.wez.wezterm", "org.alacritty"
+    ]
+    var seen = excluded
+    var choices: [ShelfChoice] = []
+    for app in NSWorkspace.shared.runningApplications where app.activationPolicy == .regular && !app.isTerminated {
+        guard let bundle = app.bundleIdentifier, !ignored.contains(bundle), !seen.contains(bundle) else { continue }
+        seen.insert(bundle)
+        let name = app.localizedName ?? bundle
+        choices.append(ShelfChoice(windowID: nil, bundleIdentifier: bundle,
+                                   appName: name, windowTitle: name, icon: app.icon))
+    }
+    return choices.sorted { $0.appName.localizedCaseInsensitiveCompare($1.appName) == .orderedAscending }
 }
 
 // Scan only application roots, never bundle internals or user documents.
