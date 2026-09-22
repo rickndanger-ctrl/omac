@@ -181,10 +181,11 @@ class MixedLayout(unittest.TestCase):
     with self.subTest(args=args),self.assertRaisesRegex(RuntimeError,'Restore Mixed Layout'):
      c.tile_command(*args)
    aero.assert_not_called()
- def test_tile_mutations_keep_original_behavior_without_mixed_mode(self):
-  with patch.object(c,'page',return_value='2'),patch.object(c,'aero') as aero:
+ def test_tile_mutations_balance_rectangles_without_mixed_mode(self):
+  with patch.object(c,'page',return_value='2'),patch.object(c,'aero') as aero,patch.object(c,'arrange') as arrange:
    c.tile_command('swap','right');c.tile_command('resize','+50');c.tile_command('balance');c.tile_command('layout-toggle');c.tile_command('fullscreen');c.tile_command('native-fullscreen')
-  self.assertEqual([call.args for call in aero.call_args_list],[('swap','right'),('resize','smart','+50'),('balance-sizes','--workspace','2'),('layout','floating','tiling'),('fullscreen',),('macos-native-fullscreen',)])
+  arrange.assert_called_once_with('2')
+  self.assertEqual([call.args for call in aero.call_args_list],[('swap','right'),('resize','smart','+50'),('layout','floating','tiling'),('fullscreen',),('macos-native-fullscreen',)])
  def test_mixed_expand_persists_before_mutation_then_restores_compact_frame(self):
   self.checkpoint();live=[self.app,*self.terminals];writes=[]
   def save(data): writes.append(json.loads(json.dumps(data)));(c.STATE/'mixed-layout.json').write_text(json.dumps(data))

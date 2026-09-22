@@ -396,7 +396,7 @@ def tile_command(command,value=None):
   raise RuntimeError('Restore Mixed Layout before changing its floating window shapes or tile tree.')
  if command=='swap': aero('swap',value)
  elif command=='resize': aero('resize','smart',value)
- elif command=='balance': aero('balance-sizes','--workspace',workspace)
+ elif command=='balance': arrange(workspace)
  elif command=='layout-toggle': aero('layout','floating','tiling')
  elif command=='fullscreen': aero('fullscreen')
  else: aero('macos-native-fullscreen')
@@ -464,8 +464,13 @@ def running_terminal_source():
 
 def arrange(workspace=None):
  workspace=workspace or page()
- tiles=terminal_windows(workspace)
- if not tiles: return 0
+ terminal_count=len(terminal_windows(workspace))
+ # Include native apps in the same tile tree. Pair adjacent windows into
+ # rectangular tiles instead of letting each new app become a tall column.
+ tiles=[w for w in windows() if w.get('workspace')==workspace
+        and w.get('window-layout') in ('h_tiles','v_tiles','tiling')
+        and not is_remote_viewer(w)]
+ if not tiles: return terminal_count
  ids=[str(w['window-id']) for w in tiles]
  focused=aero('list-windows','--focused','--format','%{window-id}',check=False)
  target=focused if focused in ids else ids[0]
@@ -473,22 +478,23 @@ def arrange(workspace=None):
  commands=[]
  for wid in ids:
   commands.extend([f'fullscreen off --window-id {wid}',
-                   f'move-node-to-workspace --window-id {wid} {workspace}',
                    f'layout --window-id {wid} tiling'])
  commands.extend([f'workspace {workspace}',f'focus --window-id {ids[0]}',
                   'flatten-workspace-tree',f'layout --workspace {workspace} --root h_tiles'])
  aero('eval','; '.join(commands))
  # Query the actual tree order after flattening; title order need not match it.
  ordered=[]
+ # DFS also counts floating windows, including the parked remote viewer.
  for index in range(len(windows())):
   aero('focus','--dfs-index',str(index),check=False)
   wid=aero('list-windows','--focused','--format','%{window-id}',check=False)
   if wid in ids and wid not in ordered: ordered.append(wid)
- for i in range(0,len(ordered)-1,2):
-  aero('join-with','--window-id',ordered[i],'right')
+ if len(ordered)>2:
+  for i in range(0,len(ordered)-1,2):
+   aero('join-with','--window-id',ordered[i],'right')
  aero('balance-sizes','--workspace',workspace)
  aero('focus','--window-id',target)
- return len(tiles)
+ return terminal_count
 
 def start_services():
  load('watcher');run('launchctl','kickstart',job('watcher'))
@@ -536,6 +542,7 @@ def enter(count=0,add=False):
    source=current or terminal_windows() or running_terminal_source()
    if source:
     total=add_window_to_existing_terminal(source,workspace)
+    arrange(workspace)
     save_pages()
     return f'{total} plain terminal windows tiled. No agents launched.'
   present={w['window-title'] for w in terminal_windows()}
@@ -568,6 +575,7 @@ def enter(count=0,add=False):
    if added:
     aero('workspace',workspace)
     aero('focus','--window-id',str(added[-1]['window-id']))
+    arrange(workspace)
     # AeroSpace already tiles the inserted window. Rebuilding the whole tree
     # can expose another workspace and disturbs the user's native-app layout.
    total=len(terminal_windows(workspace))
