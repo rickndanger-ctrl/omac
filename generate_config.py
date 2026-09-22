@@ -13,8 +13,12 @@ default-root-container-orientation = 'horizontal'
 persistent-workspaces = ['1', '2', '3', '4', '5']
 [mode.main.binding]
 [mode.active.binding]
-cmd-alt-space = 'exec-and-forget "/Applications/Omac.app/Contents/MacOS/AgentControlCenter" --shelf-action shelf'
-cmd-alt-shift-space = 'exec-and-forget "/Applications/Omac.app/Contents/MacOS/AgentControlCenter" --shelf-action shelf-add'
+ctrl-alt-m = 'exec-and-forget /opt/homebrew/bin/python3 "CONTROLLER" mixed-expand'
+ctrl-alt-shift-2 = 'exec-and-forget /opt/homebrew/bin/python3 "CONTROLLER" mixed-2'
+ctrl-alt-shift-3 = 'exec-and-forget /opt/homebrew/bin/python3 "CONTROLLER" mixed-3'
+ctrl-alt-shift-r = 'exec-and-forget /opt/homebrew/bin/python3 "CONTROLLER" mixed-restore'
+ctrl-alt-space = 'exec-and-forget "/Applications/Omac.app/Contents/MacOS/AgentControlCenter" --shelf-action shelf'
+ctrl-alt-shift-space = 'exec-and-forget "/Applications/Omac.app/Contents/MacOS/AgentControlCenter" --shelf-action shelf-add'
 cmd-alt-down = 'exec-and-forget "/Applications/Omac.app/Contents/MacOS/AgentControlCenter" --shelf-action shelf-tuck'
 ctrl-alt-left = 'exec-and-forget "/Applications/Omac.app/Contents/MacOS/AgentControlCenter" --shelf-action place-left'
 ctrl-alt-right = 'exec-and-forget "/Applications/Omac.app/Contents/MacOS/AgentControlCenter" --shelf-action place-right'
@@ -40,25 +44,25 @@ cmd-alt-t = 'exec-and-forget open -b ru.keepcoder.Telegram'
 cmd-alt-i = 'exec-and-forget open -b com.apple.MobileSMS'
 cmd-alt-m = 'exec-and-forget open -b com.apple.mail'
 cmd-alt-s = 'exec-and-forget open -b com.apple.systempreferences'
-cmd-left = 'focus --ignore-floating left'
-cmd-right = 'focus --ignore-floating right'
-cmd-up = 'focus --ignore-floating up'
-cmd-down = 'focus --ignore-floating down'
-cmd-shift-left = 'swap left'
-cmd-shift-right = 'swap right'
-cmd-shift-up = 'swap up'
-cmd-shift-down = 'swap down'
-cmd-minus = 'resize smart -50'
-cmd-equal = 'resize smart +50'
-cmd-f = 'fullscreen'
+cmd-left = 'exec-and-forget /opt/homebrew/bin/python3 "CONTROLLER" focus-direction left'
+cmd-right = 'exec-and-forget /opt/homebrew/bin/python3 "CONTROLLER" focus-direction right'
+cmd-up = 'exec-and-forget /opt/homebrew/bin/python3 "CONTROLLER" focus-direction up'
+cmd-down = 'exec-and-forget /opt/homebrew/bin/python3 "CONTROLLER" focus-direction down'
+cmd-shift-left = 'exec-and-forget /opt/homebrew/bin/python3 "CONTROLLER" tile-command swap left'
+cmd-shift-right = 'exec-and-forget /opt/homebrew/bin/python3 "CONTROLLER" tile-command swap right'
+cmd-shift-up = 'exec-and-forget /opt/homebrew/bin/python3 "CONTROLLER" tile-command swap up'
+cmd-shift-down = 'exec-and-forget /opt/homebrew/bin/python3 "CONTROLLER" tile-command swap down'
+cmd-minus = 'exec-and-forget /opt/homebrew/bin/python3 "CONTROLLER" tile-command resize -50'
+cmd-equal = 'exec-and-forget /opt/homebrew/bin/python3 "CONTROLLER" tile-command resize +50'
+cmd-f = 'exec-and-forget /opt/homebrew/bin/python3 "CONTROLLER" tile-command fullscreen'
 cmd-k = 'exec-and-forget "/Applications/Omac.app/Contents/MacOS/AgentControlCenter" --guide' 
 cmd-o = "exec-and-forget open -g 'agent-control-center://center'"
-cmd-t = 'layout floating tiling'
-cmd-alt-f = 'macos-native-fullscreen'
-alt-tab = 'focus --wrap-around dfs-next'
-alt-shift-tab = 'focus --wrap-around dfs-prev'
-cmd-b = 'balance-sizes'
-cmd-shift-equal = 'balance-sizes'
+cmd-t = 'exec-and-forget /opt/homebrew/bin/python3 "CONTROLLER" tile-command layout-toggle'
+cmd-alt-f = 'exec-and-forget /opt/homebrew/bin/python3 "CONTROLLER" tile-command native-fullscreen'
+alt-tab = "exec-and-forget open -g 'agent-control-center://cycle-next'"
+alt-shift-tab = "exec-and-forget open -g 'agent-control-center://cycle-previous'"
+cmd-b = 'exec-and-forget /opt/homebrew/bin/python3 "CONTROLLER" tile-command balance'
+cmd-shift-equal = 'exec-and-forget /opt/homebrew/bin/python3 "CONTROLLER" tile-command balance'
 cmd-esc = "exec-and-forget open -g 'agent-control-center://rescue'"
 cmd-shift-esc = "exec-and-forget open -g 'agent-control-center://refocus'"
 cmd-alt-enter = 'exec-and-forget "/Applications/Omac.app/Contents/MacOS/AgentControlCenter" --shelf-action menu'
@@ -90,6 +94,10 @@ for i,line in enumerate(lines):
   lines[i]='after-startup-command = ['+json.dumps('exec-and-forget '+shlex.join([PYTHON,str(r/'control.py'),'recover']))+']'
  elif line.startswith('exec-on-workspace-change ='):
   lines[i]='exec-on-workspace-change = '+json.dumps([app,'--shelf-page-changed'])
+ elif '"CONTROLLER"' in line:
+  key=line.split(' =',1)[0]
+  arguments=shlex.split(line.split('"CONTROLLER"',1)[1].rstrip("'").strip())
+  lines[i]=key+' = '+json.dumps('exec-and-forget '+shlex.join([PYTHON,str(r/'control.py'),*arguments]))
  elif line.startswith('cmd-alt-') and ('open -a ' in line or 'open -b ' in line):
   app_bundles={'c':'com.anthropic.claudefordesktop','h':'com.nousresearch.hermes.setup','g':'com.openai.codex','b':'com.google.Chrome','e':'com.apple.finder','r':'com.todesktop.230313mzl4w4u92','v':'com.microsoft.VSCode','t':'ru.keepcoder.Telegram','i':'com.apple.MobileSMS','m':'com.apple.mail','s':'com.apple.systempreferences'}
   key=line.split(' =')[0].strip()

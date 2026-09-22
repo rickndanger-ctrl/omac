@@ -4,7 +4,6 @@ import fcntl,json,math,os,plistlib,subprocess,sys,time
 from functools import lru_cache
 from pathlib import Path
 from portable_paths import SOURCE as ROOT, STATE, RUNTIME, AERO, APP
-from tile_modes import Mode,TileModePlanner,WindowIdentity,WindowSnapshot
 STATE.mkdir(parents=True,exist_ok=True)
 DOMAIN=f'gui/{os.getuid()}'
 ROLES=[str(i) for i in range(1,31)]
@@ -89,114 +88,206 @@ def ready():
  raise RuntimeError('AeroSpace is not ready. Grant AeroSpace Accessibility access in System Settings, then try Enter again.')
 def save_status(value): (STATE/'status').write_text(value)
 
-def _tile_mode_path(): return STATE/'tile-modes.json'
-def _tile_mode_key(identity): return f'{identity.boot}:{identity.app_pid}:{identity.window_id}'
-def _load_tile_modes():
- try: return json.loads(_tile_mode_path().read_text())
- except (FileNotFoundError,ValueError,OSError): return {}
-def _save_tile_modes(data):
- temp=STATE/'tile-modes.tmp';temp.write_text(json.dumps(data));temp.replace(_tile_mode_path())
-
-def _native_target(identity):
- raw=run(APP,'--window-target',str(identity.window_id),str(identity.app_pid))
- try: data=json.loads(raw)
+def _mixed_path(): return STATE/'mixed-layout.json'
+def _write_mixed(data):
+ temp=STATE/'mixed-layout.tmp';temp.write_text(json.dumps(data));temp.replace(_mixed_path())
+def _read_mixed():
+ try:
+  data=json.loads(_mixed_path().read_text())
+  return data if isinstance(data,dict) else None
+ except (FileNotFoundError,ValueError,OSError): return None
+def _native_target(window):
+ raw=run(APP,'--window-target',str(window['window-id']),str(window['app-pid']))
+ try: target=json.loads(raw)
  except (TypeError,ValueError) as exc: raise RuntimeError('Native window target returned invalid JSON.') from exc
- if data.get('windowID')!=identity.window_id or data.get('pid')!=identity.app_pid:
-  raise RuntimeError('Native window target identity does not match AeroSpace.')
- frame=data.get('frame');visible=data.get('visibleFrame')
- if not isinstance(frame,list) or len(frame)!=4 or not isinstance(visible,list) or len(visible)!=4:
-  raise RuntimeError('Native window target did not return complete frames.')
- try: frame=[float(value) for value in frame];visible=[float(value) for value in visible]
- except (TypeError,ValueError) as exc: raise RuntimeError('Native window target returned nonnumeric frames.') from exc
- if any(not all(math.isfinite(v) for v in rect) or rect[2]<=0 or rect[3]<=0 for rect in (frame,visible)):
-  raise RuntimeError('Native window target returned invalid geometry.')
- return {'frame':frame,'visibleFrame':visible}
-def _same_frame(actual,wanted):
- try:
-  return len(actual)==4 and len(wanted)==4 and all(math.isfinite(float(a)) and math.isfinite(float(b)) and abs(float(a)-float(b))<2 for a,b in zip(actual,wanted))
- except (TypeError,ValueError,OverflowError): return False
-def _preflight_workspace(workspace):
- try: rows=json.loads(aero('list-windows','--workspace',workspace,'--format','%{window-id} %{app-pid} %{workspace} %{window-layout}','--json'))
- except (TypeError,ValueError) as exc: raise RuntimeError('Workspace inventory is invalid.') from exc
- if not isinstance(rows,list) or not rows: raise RuntimeError('Workspace inventory is empty.')
- frames={}
- for row in rows:
-  try: identity=WindowIdentity(int(row['window-id']),int(row['app-pid']),boot_session())
-  except (KeyError,TypeError,ValueError) as exc: raise RuntimeError('Workspace inventory has an invalid window identity.') from exc
-  frames[_tile_mode_key(identity)]={'identity':identity,'target':_native_target(identity)}
+ if target.get('windowID')!=window['window-id'] or target.get('pid')!=window['app-pid']:
+  raise RuntimeError('Native window identity changed.')
+ for key in ('frame','visibleFrame'):
+  values=target.get(key)
+  if not isinstance(values,list) or len(values)!=4:
+   raise RuntimeError('Native window target returned incomplete geometry.')
+  try: values=[float(value) for value in values]
+  except (TypeError,ValueError) as exc: raise RuntimeError('Native window target returned invalid geometry.') from exc
+  if not all(math.isfinite(value) for value in values) or values[2]<=0 or values[3]<=0:
+   raise RuntimeError('Native window target returned invalid geometry.')
+  target[key]=values
+ return target
+def _same_frame(left,right):
+ try: return len(left)==4 and len(right)==4 and all(abs(float(a)-float(b))<2 for a,b in zip(left,right))
+ except (TypeError,ValueError): return False
+def _set_frame(window,frame):
+ run(APP,'--window-frame',str(window['window-id']),str(window['app-pid']),*(str(value) for value in frame))
+ deadline=time.monotonic()+1.0;matches=0
+ while time.monotonic()<deadline:
+  actual=_native_target(window)['frame']
+  matches=matches+1 if _same_frame(actual,frame) else 0
+  if matches>=2:return
+  time.sleep(.05)
+ raise RuntimeError('Window did not settle at its requested frame.')
+def _mixed_frames(visible,count,app_side='left',gap=8):
+ x,y,width,height=visible; x+=gap;y+=gap;width-=2*gap;height-=2*gap
+ if width<=3*gap or height<=(count+1)*gap: raise RuntimeError('Screen is too small for mixed layout.')
+ half=(width-gap)//2;left=[x,y,half,height];right=[x+half+gap,y,width-half-gap,height]
+ app,area=(left,right) if app_side=='left' else (right,left)
+ each=(area[3]-gap*(count-1))//count;frames=[app]
+ top=area[1]
+ for index in range(count):
+  cell=area[1]+area[3]-top if index==count-1 else each
+  frames.append([area[0],top,area[2],cell]);top+=cell+gap
  return frames
-def _restore_previous_mode(wid,old_mode,original_layout,identity=None,original_frame=None):
+def _restore_mixed_members(members):
  errors=[]
- if identity is not None and original_frame is not None:
-  try: run(APP,'--window-frame',wid,str(identity.app_pid),*(str(value) for value in original_frame))
-  except Exception as exc: errors.append(f'native frame rollback: {exc}')
- try:
-  if old_mode is Mode.FULL: aero('fullscreen','on','--window-id',wid)
-  elif old_mode is Mode.HALF: aero('layout','--window-id',wid,'floating')
-  else:
-   aero('fullscreen','off','--window-id',wid);aero('layout','--window-id',wid,original_layout)
- except Exception as exc: errors.append(f'AeroSpace rollback: {exc}')
+ for member in members:
+  window={'window-id':member.get('window-id'),'app-pid':member.get('app-pid')}
+  try:
+   _native_target(window)
+   aero('fullscreen','off','--window-id',str(window['window-id']))
+   aero('layout','--window-id',str(window['window-id']),'floating')
+   _set_frame(window,member['original-frame'])
+   aero('layout','--window-id',str(window['window-id']),member['original-layout'])
+  except Exception as exc: errors.append(f"{window.get('window-id')}: {exc}")
  return errors
-
-def size_window(mode):
- try: mode=Mode(mode)
- except (TypeError,ValueError) as exc: raise RuntimeError('size must be small, half, or full') from exc
- focused=json.loads(aero('list-windows','--focused','--format','%{window-id} %{app-pid} %{workspace} %{window-layout}','--json'))
- if not focused: raise RuntimeError('Focus a window first.')
- window=focused[0]
- try:
-  identity=WindowIdentity(int(window['window-id']),int(window['app-pid']),boot_session())
- except (KeyError,TypeError,ValueError) as exc: raise RuntimeError('Focused window has no stable identity.') from exc
- workspace=window.get('workspace')
+def apply_mixed(count,app_side='left'):
+ if count not in (2,3): raise RuntimeError('Mixed layout requires two or three terminals.')
+ if _read_mixed(): raise RuntimeError('Restore the current mixed layout before applying another.')
+ workspace=aero('list-workspaces','--focused').strip()
  if workspace not in ('1','2','3','4','5'): raise RuntimeError('Focused window is outside an Omac page.')
- key=_tile_mode_key(identity);saved=_load_tile_modes();record=saved.get(key,{})
- original_layout=window.get('window-layout')
- if not record and original_layout not in ('tiling','h_tiles','v_tiles'):
-  raise RuntimeError('Size modes require a tiled window so its original slot can be restored.')
- planner=TileModePlanner(WindowSnapshot(identity,workspace,str(identity.window_id)))
- try: planner.mode=Mode(record.get('mode',Mode.SMALL.value))
- except ValueError: planner.mode=Mode.SMALL
- old_mode=planner.mode
- intent=planner.transition(identity,mode)
- if intent.action=='noop': return f'Window already {mode.value}.'
- wid=str(identity.window_id)
- preflight=_preflight_workspace(workspace)
- target=preflight.get(key,{}).get('target')
- if target is None: raise RuntimeError('Focused window is absent from the workspace preflight.')
- try: live=json.loads(aero('list-windows','--focused','--format','%{window-id} %{app-pid} %{workspace} %{window-layout}','--json'))[0]
- except (TypeError,ValueError,IndexError) as exc: raise RuntimeError('Focused window changed during size preflight.') from exc
- if (int(live.get('window-id',-1)),int(live.get('app-pid',-1)),live.get('workspace'))!=(identity.window_id,identity.app_pid,workspace):
-  raise RuntimeError('Focused window or page changed during size preflight.')
- original_frame=record.get('original_frame',target['frame'])
- if not isinstance(original_frame,list) or len(original_frame)!=4:
-  raise RuntimeError('Cannot restore without the original native frame.')
+ focused=json.loads(aero('list-windows','--focused','--format','%{window-id} %{app-pid} %{app-name} %{workspace} %{window-layout}','--json'))
+ if not focused: raise RuntimeError('Focus the native app to place first.')
+ app=focused[0]
+ if app.get('app-name')=='Ghostty' or app.get('workspace')!=workspace:
+  raise RuntimeError('Focus a nonterminal app on the current Omac page.')
+ terminals=terminal_windows(workspace)[:count]
+ if len(terminals)!=count: raise RuntimeError(f'Mixed layout needs {count} managed terminals on this page.')
+ selected=[app,*terminals];snapshots=[];visible=None
+ for window in selected:
+  if window.get('window-layout') not in ('floating','tiling','h_tiles','v_tiles'):
+   raise RuntimeError('Mixed layout requires ordinary floating or tiled windows.')
+  target=_native_target(window)
+  if visible is None: visible=target['visibleFrame']
+  elif not _same_frame(target['visibleFrame'],visible): raise RuntimeError('All mixed-layout windows must be on one display.')
+  snapshots.append({'window-id':window['window-id'],'app-pid':window['app-pid'],'workspace':workspace,
+                    'original-frame':target['frame'],'original-layout':window['window-layout']})
+ frames=_mixed_frames(visible,count,app_side);changed=[]
+ checkpoint={'boot':boot_session(),'workspace':workspace,'app-side':app_side,
+             'state':'applying','members':snapshots}
+ _write_mixed(checkpoint)
  try:
-  if mode is Mode.SMALL:
-   if record.get('original_layout','tiling') not in ('tiling','h_tiles','v_tiles'):
-    raise RuntimeError('Cannot restore the original tile slot safely.')
-   aero('fullscreen','off','--window-id',wid)
-   run(APP,'--window-frame',wid,str(identity.app_pid),*(str(value) for value in original_frame))
-   restored=_native_target(identity)
-   if not _same_frame(restored['frame'],original_frame):
-    raise RuntimeError('Native frame did not restore to its saved bounds.')
-   aero('layout','--window-id',wid,record.get('original_layout','tiling'))
-   restored=_native_target(identity)
-   if not _same_frame(restored['frame'],original_frame):
-    raise RuntimeError('Native frame changed after tiled layout was restored.')
-  elif mode is Mode.HALF:
-   aero('fullscreen','off','--window-id',wid)
-   aero('layout','--window-id',wid,'floating')
-   run(APP,'--window-half',wid,str(identity.app_pid))
-  else:
-   aero('fullscreen','on','--window-id',wid)
+  for window,member,frame in zip(selected,snapshots,frames):
+   changed.append(member)
+   aero('fullscreen','off','--window-id',str(window['window-id']))
+   aero('layout','--window-id',str(window['window-id']),'floating')
+   _set_frame(window,frame);member['placed-frame']=frame
+  checkpoint['state']='active';_write_mixed(checkpoint)
  except Exception as exc:
-  rollback_errors=_restore_previous_mode(wid,old_mode,record.get('original_layout',original_layout),identity,original_frame)
-  suffix=(' Rollback errors: '+'; '.join(rollback_errors)) if rollback_errors else ''
-  raise RuntimeError(f'Size transition failed; previous mode restoration attempted: {exc}.{suffix}') from exc
- saved[key]={'mode':mode.value,'workspace':workspace,'window-id':identity.window_id,'app-pid':identity.app_pid,'boot':identity.boot,'original_layout':record.get('original_layout',original_layout),'original_frame':original_frame,'visible_frame':record.get('visible_frame',target['visibleFrame'])}
- aero('workspace',workspace)
- _save_tile_modes(saved)
- return f'Window set to {mode.value}; session preserved.'
+  errors=_restore_mixed_members(changed)
+  if errors:
+   checkpoint['state']='recovery-required';checkpoint['rollback-errors']=errors;_write_mixed(checkpoint)
+  else:_mixed_path().unlink(missing_ok=True)
+  suffix=(' Rollback errors: '+'; '.join(errors)) if errors else ''
+  raise RuntimeError(f'Mixed layout failed and rollback was attempted: {exc}.{suffix}') from exc
+ aero('focus','--window-id',str(app['window-id']))
+ return f'Mixed layout applied to one app and {count} terminals.'
+def restore_mixed():
+ data=_read_mixed()
+ if not data: return 'No mixed layout is active.'
+ if data.get('boot')!=boot_session(): raise RuntimeError('Mixed layout belongs to an earlier boot and cannot be restored safely.')
+ workspace=data.get('workspace')
+ if workspace!=page(): raise RuntimeError('Switch to the mixed layout page before restoring it.')
+ live={w['window-id']:w for w in windows()}
+ for member in data.get('members',[]):
+  current=live.get(member.get('window-id'))
+  if not current or current.get('app-pid')!=member.get('app-pid') or current.get('workspace')!=workspace:
+   raise RuntimeError('Mixed layout member identity or page changed; restore refused.')
+ errors=_restore_mixed_members(data.get('members',[]))
+ if errors: raise RuntimeError('Mixed layout restore incomplete: '+'; '.join(errors))
+ _mixed_path().unlink(missing_ok=True)
+ return 'Mixed layout restored.'
+def _center(frame): return frame[0]+frame[2]/2,frame[1]+frame[3]/2
+def focus_direction(direction):
+ if direction not in ('left','right','up','down'): raise RuntimeError('Direction must be left, right, up, or down.')
+ data=_read_mixed();workspace=page()
+ if data and data.get('boot')==boot_session() and data.get('workspace')==workspace:
+  live={w['window-id']:w for w in windows()};members=[]
+  for saved in data.get('members',[]):
+   current=live.get(saved.get('window-id'))
+   if not current or current.get('app-pid')!=saved.get('app-pid') or current.get('workspace')!=workspace: break
+   try: frame=_native_target(current)['frame']
+   except RuntimeError: break
+   members.append((current,frame))
+  else:
+   focused=json.loads(aero('list-windows','--focused','--format','%{window-id}','--json'))
+   focused_id=focused[0].get('window-id') if focused else None
+   current=next(((window,frame) for window,frame in members if window['window-id']==focused_id),None)
+   if current:
+    fx,fy=_center(current[1]);choices=[]
+    for window,frame in members:
+     if window['window-id']==focused_id: continue
+     cx,cy=_center(frame)
+     primary,cross={'left':(fx-cx,abs(fy-cy)),'right':(cx-fx,abs(fy-cy)),
+                    'up':(fy-cy,abs(fx-cx)),'down':(cy-fy,abs(fx-cx))}[direction]
+     if primary>0: choices.append((cross,primary,window['window-id']))
+    if choices:
+     target=min(choices)[2];aero('focus','--window-id',str(target));return f'Focused mixed-layout window {target}.'
+    return 'No mixed-layout window in that direction.'
+ aero('focus','--ignore-floating',direction,check=False)
+ return 'Used ordinary tile navigation.'
+def mixed_expand_toggle():
+ data=_read_mixed()
+ if not data: raise RuntimeError('Apply Mixed Layout before expanding a mixed window.')
+ if data.get('state')!='active': raise RuntimeError('Restore the incomplete mixed layout before expanding a window.')
+ workspace=data.get('workspace')
+ if data.get('boot')!=boot_session() or workspace!=page():
+  raise RuntimeError('Mixed layout boot or page changed; expand refused.')
+ live={w['window-id']:w for w in windows()}
+ focused=json.loads(aero('list-windows','--focused','--format','%{window-id} %{app-pid} %{workspace}','--json'))
+ if not focused: raise RuntimeError('Focus a mixed-layout window first.')
+ row=focused[0];member=next((item for item in data.get('members',[]) if item.get('window-id')==row.get('window-id')),None)
+ current=live.get(row.get('window-id'))
+ if (not member or not current or current.get('app-pid')!=member.get('app-pid') or
+     row.get('app-pid')!=member.get('app-pid') or current.get('workspace')!=workspace or row.get('workspace')!=workspace):
+  raise RuntimeError('Focused window is not a valid member of this mixed layout.')
+ target=_native_target(current);before=target['frame']
+ if member.get('expanded'):
+  wanted=member.get('pre-expand-frame')
+  if not isinstance(wanted,list) or len(wanted)!=4: raise RuntimeError('Mixed expand restore frame is missing.')
+  member['expand-state']='restoring';_write_mixed(data)
+  try:_set_frame(current,wanted)
+  except Exception as exc:
+   try:_set_frame(current,before)
+   except Exception as rollback:
+    data['state']='recovery-required';data['rollback-errors']=[f"{current['window-id']}: {rollback}"];_write_mixed(data)
+    raise RuntimeError(f'Mixed expand restore failed; rollback also failed: {exc}; {rollback}') from exc
+   member['expand-state']='expanded';_write_mixed(data)
+   raise RuntimeError(f'Mixed expand restore failed; expanded frame was restored: {exc}') from exc
+  member.pop('expanded',None);member.pop('pre-expand-frame',None);member.pop('expand-state',None);_write_mixed(data)
+  return 'Mixed window restored to its compact frame.'
+ visible=target['visibleFrame'];wanted=[visible[0]+8,visible[1]+8,visible[2]-16,visible[3]-16]
+ member['pre-expand-frame']=before;member['expand-state']='expanding';_write_mixed(data)
+ try:_set_frame(current,wanted)
+ except Exception as exc:
+  try:_set_frame(current,before)
+  except Exception as rollback:
+   data['state']='recovery-required';data['rollback-errors']=[f"{current['window-id']}: {rollback}"];_write_mixed(data)
+   raise RuntimeError(f'Mixed expand failed; rollback also failed: {exc}; {rollback}') from exc
+  member.pop('pre-expand-frame',None);member.pop('expand-state',None);_write_mixed(data)
+  raise RuntimeError(f'Mixed expand failed; compact frame was restored: {exc}') from exc
+ member['expanded']=True;member['expand-state']='expanded';_write_mixed(data)
+ return 'Mixed window expanded to the usable monitor area.'
+def tile_command(command,value=None):
+ allowed={'swap':('left','right','up','down'),'resize':('-50','+50'),'balance':(None,),
+          'layout-toggle':(None,),'fullscreen':(None,),'native-fullscreen':(None,)}
+ if command not in allowed or value not in allowed[command]: raise RuntimeError('Unsupported tile command.')
+ data=_read_mixed();workspace=page()
+ if data and data.get('boot')==boot_session() and data.get('workspace')==workspace:
+  raise RuntimeError('Restore Mixed Layout before changing its floating window shapes or tile tree.')
+ if command=='swap': aero('swap',value)
+ elif command=='resize': aero('resize','smart',value)
+ elif command=='balance': aero('balance-sizes','--workspace',workspace)
+ elif command=='layout-toggle': aero('layout','floating','tiling')
+ elif command=='fullscreen': aero('fullscreen')
+ else: aero('macos-native-fullscreen')
+ return 'Tile command applied.'
 
 def stop(restore=False):
  run('launchctl','bootout',job('watcher'),check=False)
@@ -368,6 +459,15 @@ def main():
   elif action=='enable-login': print(login_enabled(True))
   elif action=='disable-login': print(login_enabled(False))
   elif action=='recover': print(recover())
+  elif action in ('mixed-2','mixed-3'): print(apply_mixed(int(action[-1])))
+  elif action=='mixed-restore': print(restore_mixed())
+  elif action=='focus-direction':
+   if len(sys.argv)<3: raise RuntimeError('Usage: control.py focus-direction <left|right|up|down>')
+   print(focus_direction(sys.argv[2]))
+  elif action=='mixed-expand': print(mixed_expand_toggle())
+  elif action=='tile-command':
+   if len(sys.argv)<3: raise RuntimeError('Usage: control.py tile-command <swap|resize|balance> [value]')
+   print(tile_command(sys.argv[2],sys.argv[3] if len(sys.argv)>3 else None))
   elif action in ('enter','four','six','new'): print(enter(6 if action=='six' else (4 if action=='four' else 0),add=action=='new'))
   elif action=='center':
    focused=json.loads(aero('list-windows','--focused','--format','%{window-id} %{app-pid} %{workspace} %{window-layout}','--json'))
@@ -389,9 +489,6 @@ def main():
      raise
     aero('focus','--window-id',wid)
     print('Terminal centered; Command-O returns it to tiling.')
-  elif action=='size':
-   if len(sys.argv)<3: raise RuntimeError('Usage: control.py size <small|half|full>')
-   print(size_window(sys.argv[2]))
   elif action in ('pause','exit'): print(stop(action=='exit'))
   elif action=='status': print((STATE/'status').read_text() if (STATE/'status').exists() else 'Inactive')
   elif action=='rollback':

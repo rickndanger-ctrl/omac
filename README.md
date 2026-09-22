@@ -16,10 +16,14 @@ Dependencies remain external: AeroSpace app/CLI, Ghostty and Python. The public-
 - Command–arrows focuses a tile; Shift swaps tiles.
 - Command–O centers/returns a tile; Command–F enlarges/restores; Command–T floats/tiles.
 - Command–Return adds a terminal; Control–Option–4 / 6 arranges four/six terminals.
+- Option–Tab / Option–Shift–Tab cycles eligible windows on the current page.
+- Control–Option–Shift–2 / 3 applies an explicit app-plus-terminals mixed layout; Control–Option–M expands or returns its focused member, and Control–Option–Shift–R restores the original layout.
 - Command–K opens the guide. Control–Option–P pauses. Control–Option–Escape disengages and leaves agents running.
 - Screensaver preview: 1 assembly, 2 red laser, 3 lightning, 4 logo; Escape closes.
 
 Existing apps retain their minimum sizes. The five pages are AeroSpace workspaces, not additional native Mission Control Spaces. A reboot cannot preserve running shell processes. Renderer previews are verified; native idle saver activation remains unverified.
+
+Mixed layout is never applied during app launch. Restore it before swap, resize, balance, float/tile, or fullscreen commands; those shape-changing commands refuse while the protected mixed layout is active. Restore validates the boot, process, exact window ID, and page before mutation.
 
 ## Validation
 

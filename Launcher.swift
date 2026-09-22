@@ -352,6 +352,8 @@ class Delegate: NSObject,NSApplicationDelegate {
  let favorites=AppFavorites(url:state.appendingPathComponent("app-favorites.json"))
  let favoriteMenu=NSMenu(title:"App Shortcuts")
  let menuPanel=OmacMenuPanel()
+ lazy var focusBorder=FocusBorderController(stateDirectory:state)
+ lazy var windowCycler=CurrentPageWindowCycler(aerospace:aerospace ?? "/missing/aerospace")
  var menuModel:NSMenu?
  var shelfIDs:[CGWindowID]=[]
  var shelfPage:String?
@@ -436,6 +438,7 @@ class Delegate: NSObject,NSApplicationDelegate {
 
  func applicationDidFinishLaunching(_ note:Notification) {
   NSApp.appearance=NSAppearance(named:.darkAqua)
+  focusBorder.loadEnabledPreference();focusBorder.setEngaged(shelfActive())
   DistributedNotificationCenter.default().addObserver(self,selector:#selector(shelfAction(_:)),name:NSNotification.Name("com.richard.omac.shelfAction"),object:nil,suspensionBehavior:.deliverImmediately)
 
   DistributedNotificationCenter.default().addObserver(self,selector:#selector(shelfPageChanged(_:)),name:NSNotification.Name("com.richard.omac.shelfPageChanged"),object:nil,suspensionBehavior:.deliverImmediately)
@@ -446,9 +449,11 @@ class Delegate: NSObject,NSApplicationDelegate {
   item=NSStatusBar.system.statusItem(withLength:NSStatusItem.variableLength); statusTitle("▦ Omac")
   let menu=NSMenu()
   let pages=NSMenuItem(title:"Omac Pages",action:nil,keyEquivalent:"");let pageMenu=NSMenu();for n in 1...5 {let e=NSMenuItem(title:"Page \(n)    ⌘\(n)",action:#selector(selectPage(_:)),keyEquivalent:"");e.tag=n;e.target=self;pageMenu.addItem(e)};pages.submenu=pageMenu;menu.addItem(pages);menu.addItem(.separator())
-  for (title,action) in [("Engage Omac","enter"),("Open / Arrange 4 Terminals","four"),("Open / Arrange 6 Terminals","six"),("New Terminal (up to 6)","new"),("Pause Tiling and Shortcuts","pause"),("Disengage Omac — Restore Windows","exit"),("Shortcut Guide","guide"),("Choose Shelf App    ⌘⌥Space","shelf"),("Add Current App to Shelf    ⌘⌥⇧Space","shelf-add"),("Tuck Shelf Apps Away    ⌘⌥↓","shelf-tuck"),("Accessibility Settings","access"),("Start Omac at Login","enable-login"),("Disable Login Startup","disable-login"),("Quit Omac","quit")] {
+  for (title,action) in [("Engage Omac","enter"),("Open / Arrange 4 Terminals","four"),("Open / Arrange 6 Terminals","six"),("New Terminal (up to 6)","new"),("Pause Tiling and Shortcuts","pause"),("Disengage Omac — Restore Windows","exit"),("Shortcut Guide","guide"),("Choose Shelf App    ⌃⌥Space","shelf"),("Add Current App to Shelf    ⌃⌥⇧Space","shelf-add"),("Tuck Shelf Apps Away    ⌘⌥↓","shelf-tuck"),("Accessibility Settings","access"),("Start Omac at Login","enable-login"),("Disable Login Startup","disable-login"),("Quit Omac","quit")] {
    let m=NSMenuItem(title:title,action:#selector(selected(_:)),keyEquivalent:""); m.representedObject=action; m.target=self; menu.addItem(m)
   }
+  let border=NSMenuItem(title:"Yellow Focus Border",action:#selector(toggleFocusBorder(_:)),keyEquivalent:"")
+  border.target=self;border.state=focusBorder.isEnabled ? .on:.off;menu.addItem(border)
   menu.addItem(.separator())
   refreshFavoriteMenu()
   let favoriteItem=NSMenuItem(title:"Customize App Shortcuts",action:nil,keyEquivalent:"");favoriteItem.submenu=favoriteMenu;menu.addItem(favoriteItem)
@@ -484,10 +489,14 @@ class Delegate: NSObject,NSApplicationDelegate {
   // Resume an active session after launchd restarts this menu helper.
   if (try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8)) == "Active" { perform("enter") }
  }
+ @objc func toggleFocusBorder(_ sender:NSMenuItem) {
+  let enabled=sender.state != .on;focusBorder.setEnabled(enabled);sender.state=enabled ? .on:.off
+ }
+ func applicationWillTerminate(_ notification:Notification) {focusBorder.setEngaged(false)}
  @objc func urlEvent(_ event:NSAppleEventDescriptor,reply:NSAppleEventDescriptor) {
   if let text=event.paramDescriptor(forKeyword:AEKeyword(keyDirectObject))?.stringValue,let url=URLComponents(string:text),url.host=="launch",let bundle=url.queryItems?.first(where:{$0.name=="bundle"})?.value {launchShelfApp(bundle);return}
 
-  if let text=event.paramDescriptor(forKeyword:AEKeyword(keyDirectObject))?.stringValue, let action=URL(string:text)?.host, ["exit","pause","enter","four","six","new","guide","menu","center","rescue","refocus","shelf","shelf-add","shelf-tuck","place-left","place-right"].contains(action) {perform(action)}
+  if let text=event.paramDescriptor(forKeyword:AEKeyword(keyDirectObject))?.stringValue, let action=URL(string:text)?.host, ["exit","pause","enter","four","six","new","guide","menu","center","rescue","refocus","cycle-next","cycle-previous","shelf","shelf-add","shelf-tuck","place-left","place-right"].contains(action) {perform(action)}
  }
  @objc func selectPage(_ sender:NSMenuItem) { guard (try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8))=="Active" else{return};DispatchQueue.global().async {_=process(aerospace ?? "/missing/aerospace",["workspace",String(sender.tag)]);DispatchQueue.main.async{self.refreshBar()}} }
  @objc func showThemedMenu(_ sender:Any?) {
@@ -614,6 +623,10 @@ class Delegate: NSObject,NSApplicationDelegate {
   } catch {shelfError(error)}
  }
  func perform(_ action:String) {
+  if action=="cycle-next" || action=="cycle-previous" {
+   do {try windowCycler.cycle(action=="cycle-next" ? .next:.previous)} catch {shelfError(error)}
+   return
+  }
   if action=="place-left" || action=="place-right" {placeFocusedWindow(action=="place-left" ? "left":"right");return}
 
   if ["shelf","shelf-add","shelf-tuck"].contains(action) {performShelf(action);return}
@@ -721,6 +734,7 @@ class Delegate: NSObject,NSApplicationDelegate {
   if ["pause","exit","quit"].contains(action) {
    do {try shelf.releaseAll();refreshShelf();shelfPanel.orderOut(nil)} catch {shelfError(error);return}
    guide?.orderOut(nil)
+   focusBorder.setEngaged(false)
   }
   guard !busy else {return}; busy=true; statusTitle("▦ Omac · Working…")
   DispatchQueue.global().async {
@@ -728,6 +742,7 @@ class Delegate: NSObject,NSApplicationDelegate {
    DispatchQueue.main.async {
     self.busy=false
     let status=(try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8)) ?? "Inactive"
+    self.focusBorder.setEngaged(status=="Active")
     self.statusTitle("▦ Omac · \(status)")
     if result.0 != 0 { let alert=NSAlert();alert.messageText="Omac needs attention";alert.informativeText=result.1;NSApp.activate(ignoringOtherApps:true);alert.runModal() }
     if action=="quit" {try? FileManager.default.removeItem(at:state.appendingPathComponent("menu.enabled"));NSApp.terminate(nil)}
