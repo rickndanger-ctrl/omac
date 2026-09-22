@@ -507,7 +507,10 @@ def enter(count=0,add=False):
    aero('reload-config')
    aero('enable','on')
    aero('mode','active')
-  if not active and not existing: restore_pages()
+  # A disengaged AeroSpace server can still answer with Omac's config path.
+  # Restore the saved page map whenever Omac is re-entering, not only when the
+  # server was completely absent before startup.
+  if not active: restore_pages()
   migrate_pages()
   workspace=origin or page()
   current=terminal_windows(workspace)

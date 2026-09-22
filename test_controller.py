@@ -14,6 +14,11 @@ class Lifecycle(unittest.TestCase):
   with patch.object(c,'aero',return_value=str(c.RUNTIME/'config/aerospace.toml')),patch.object(c,'run') as run,patch.object(c,'ready'),patch.object(c,'load'),patch.object(c,'terminal_windows',return_value=tiles),patch.object(c,'arrange',return_value=4):
    self.assertIn('4 plain',c.enter(4))
    self.assertFalse(any('terminal.' in str(call) for call in run.call_args_list))
+ def test_inactive_reentry_restores_pages_even_with_existing_omac_server(self):
+  c.save_status('Inactive')
+  with patch.object(c,'aero',return_value=str(c.RUNTIME/'config/aerospace.toml')),patch.object(c,'run'),patch.object(c,'ready'),patch.object(c,'load'),patch.object(c,'terminal_windows',return_value=[]),patch.object(c,'arrange'):
+   c.enter()
+  c.restore_pages.assert_called_once_with()
  def test_add_at_capacity_does_not_rearrange_or_reload(self):
   c.save_status('Active')
   tiles=[{'window-id':i,'window-title':'ACC · '+str(i)} for i in range(1,7)]
