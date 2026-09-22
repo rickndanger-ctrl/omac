@@ -35,6 +35,13 @@ private final class FocusBorderView: NSView {
 /// Event-driven, click-through outline for the frontmost application's focused AX window.
 /// It never requests Accessibility permission; callers can decide how to explain a missing grant.
 final class FocusBorderController {
+    private static let excludedBundleIdentifiers: Set<String> = [
+        // Screen Sharing is an input tunnel, not part of the local tile world.
+        // Outlining its parked offscreen viewer leaves a stray yellow rectangle
+        // and can make the return to the local workspace feel like it is still
+        // selected.
+        "com.apple.ScreenSharing"
+    ]
     private let stateDirectory: URL
     private let panel: NSPanel
     private let borderView = FocusBorderView(frame: .zero)
@@ -115,7 +122,8 @@ final class FocusBorderController {
     private func observeFrontmostApplication() {
         guard isEngaged, isEnabled,
               let app = NSWorkspace.shared.frontmostApplication,
-              app.processIdentifier != ProcessInfo.processInfo.processIdentifier else {
+              app.processIdentifier != ProcessInfo.processInfo.processIdentifier,
+              !Self.excludedBundleIdentifiers.contains(app.bundleIdentifier ?? "") else {
             panel.orderOut(nil); return
         }
 
