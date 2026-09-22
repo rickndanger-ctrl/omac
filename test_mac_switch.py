@@ -100,6 +100,15 @@ class MacSwitchTests(unittest.TestCase):
             with self.assertRaises(subprocess.CalledProcessError):
                 switch.ensure_remote_control()
 
+    def test_remote_entry_enables_keyboard_forwarding(self):
+        calls=[]
+        with patch.object(switch,'run',side_effect=lambda *args:calls.append(args) or ''):
+            switch.ensure_remote_control()
+        self.assertEqual(len(calls),2)
+        self.assertIn('Switch to Control Mode',calls[0][2])
+        self.assertIn('Keyboard Controls Remote Device',calls[1][2])
+        self.assertIn('AXMenuItemMarkChar',calls[1][2])
+
 
 if __name__ == '__main__':
     unittest.main()

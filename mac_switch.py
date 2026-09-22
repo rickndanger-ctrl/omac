@@ -123,6 +123,12 @@ def ensure_remote_control():
         'tell application "System Events" to tell process "Screen Sharing" to '
         'if exists menu item "Switch to Control Mode" of menu "View" of menu bar 1 then '
         'click menu item "Switch to Control Mode" of menu "View" of menu bar 1')
+    # Screen Sharing keeps keyboard forwarding as a separate View preference.
+    # Explicitly enable it on each handoff; Control Screen alone is insufficient.
+    run('/usr/bin/osascript', '-e', '''tell application "System Events" to tell process "Screen Sharing"
+    set keyboardItem to menu item "Keyboard Controls Remote Device" of menu "View" of menu bar 1
+    if (value of attribute "AXMenuItemMarkChar" of keyboardItem) is missing value then click keyboardItem
+end tell''')
 
 
 def eligible_local(row):
