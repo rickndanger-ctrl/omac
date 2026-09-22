@@ -157,7 +157,8 @@ final class OmacMenuPanel: NSPanel, NSSearchFieldDelegate {
     private var query = ""
     private var presentationAnchor: NSRect?
     private let searchField = NSSearchField()
-    private var rebuildingForSearch = false
+    private var resultsStack: NSStackView?
+    private weak var resultsScroll: NSScrollView?
 
     /// Called once whenever a presented panel is dismissed or an action is chosen.
     var onClose: (() -> Void)?
@@ -201,20 +202,7 @@ final class OmacMenuPanel: NSPanel, NSSearchFieldDelegate {
 
     private func rebuild(anchor: NSRect? = nil) {
         guard let current = levels.last else { return }
-        let searchResults = query.isEmpty ? [] : OmacMenuSearch.results(in: levels[0].menu, query: query)
-        if query.isEmpty {
-            visibleItems = current.menu.items.filter { !$0.isHidden }
-            rowLabels = visibleItems.map(\.title)
-        } else {
-            visibleItems = searchResults.map(\.item)
-            rowLabels = searchResults.map(\.label)
-        }
-        selectableRows = visibleItems.indices.filter {
-            let item = visibleItems[$0]
-            return !item.isSeparatorItem && item.isEnabled && (query.isEmpty ? (item.submenu != nil || item.action != nil) : item.action != nil)
-        }
-        selectedPosition = selectableRows.isEmpty ? 0 : min(selectedPosition, selectableRows.count - 1)
-        rowButtons.removeAll()
+        updateVisibleItems(current: current)
 
         let root = NSView()
         root.wantsLayer = true
@@ -236,6 +224,68 @@ final class OmacMenuPanel: NSPanel, NSSearchFieldDelegate {
         stack.alignment = .width
         stack.spacing = 2
         stack.edgeInsets = NSEdgeInsets(top: 5, left: 7, bottom: 7, right: 7)
+        resultsStack = stack
+        populateRows(in: stack)
+
+        let document = NSView()
+        document.translatesAutoresizingMaskIntoConstraints = false
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        document.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: document.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: document.trailingAnchor),
+            stack.topAnchor.constraint(equalTo: document.topAnchor),
+            stack.bottomAnchor.constraint(equalTo: document.bottomAnchor),
+            document.widthAnchor.constraint(equalToConstant: panelWidth)
+        ])
+
+        let scroll = NSScrollView()
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+        scroll.drawsBackground = false
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.borderType = .noBorder
+        scroll.documentView = document
+        resultsScroll = scroll
+        root.addSubview(scroll)
+
+        NSLayoutConstraint.activate([
+            header.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            header.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            header.topAnchor.constraint(equalTo: root.topAnchor),
+            header.heightAnchor.constraint(equalToConstant: chromeHeight),
+            scroll.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            scroll.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            scroll.topAnchor.constraint(equalTo: header.bottomAnchor),
+            scroll.bottomAnchor.constraint(equalTo: root.bottomAnchor)
+        ])
+
+        contentView = root
+        resizeForResults(stack: stack, scroll: scroll, anchor: anchor ?? presentationAnchor)
+    }
+
+    private func updateVisibleItems(current: Level) {
+        let searchResults = query.isEmpty ? [] : OmacMenuSearch.results(in: levels[0].menu, query: query)
+        if query.isEmpty {
+            visibleItems = current.menu.items.filter { !$0.isHidden }
+            rowLabels = visibleItems.map(\.title)
+        } else {
+            visibleItems = searchResults.map(\.item)
+            rowLabels = searchResults.map(\.label)
+        }
+        selectableRows = visibleItems.indices.filter {
+            let item = visibleItems[$0]
+            return !item.isSeparatorItem && item.isEnabled && (query.isEmpty ? (item.submenu != nil || item.action != nil) : item.action != nil)
+        }
+        selectedPosition = selectableRows.isEmpty ? 0 : min(selectedPosition, selectableRows.count - 1)
+    }
+
+    private func populateRows(in stack: NSStackView) {
+        for view in stack.arrangedSubviews {
+            stack.removeArrangedSubview(view)
+            view.removeFromSuperview()
+        }
+        rowButtons.removeAll()
 
         for (index, item) in visibleItems.enumerated() {
             if item.isSeparatorItem {
@@ -260,40 +310,10 @@ final class OmacMenuPanel: NSPanel, NSSearchFieldDelegate {
             empty.heightAnchor.constraint(equalToConstant: rowHeight).isActive = true
             stack.addArrangedSubview(empty)
         }
+    }
 
-        let document = NSView()
-        document.translatesAutoresizingMaskIntoConstraints = false
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        document.addSubview(stack)
-        NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: document.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: document.trailingAnchor),
-            stack.topAnchor.constraint(equalTo: document.topAnchor),
-            stack.bottomAnchor.constraint(equalTo: document.bottomAnchor),
-            document.widthAnchor.constraint(equalToConstant: panelWidth)
-        ])
-
-        let scroll = NSScrollView()
-        scroll.translatesAutoresizingMaskIntoConstraints = false
-        scroll.drawsBackground = false
-        scroll.hasVerticalScroller = true
-        scroll.autohidesScrollers = true
-        scroll.borderType = .noBorder
-        scroll.documentView = document
-        root.addSubview(scroll)
-
-        NSLayoutConstraint.activate([
-            header.leadingAnchor.constraint(equalTo: root.leadingAnchor),
-            header.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            header.topAnchor.constraint(equalTo: root.topAnchor),
-            header.heightAnchor.constraint(equalToConstant: chromeHeight),
-            scroll.leadingAnchor.constraint(equalTo: root.leadingAnchor),
-            scroll.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            scroll.topAnchor.constraint(equalTo: header.bottomAnchor),
-            scroll.bottomAnchor.constraint(equalTo: root.bottomAnchor)
-        ])
-
-        contentView = root
+    private func resizeForResults(stack: NSStackView, scroll: NSScrollView, anchor: NSRect?) {
+        stack.layoutSubtreeIfNeeded()
         let desiredRowsHeight = stack.fittingSize.height
         let screen = screenFor(anchor: anchor)
         let maximumHeight = min(640, max(150, screen.visibleFrame.height - 32))
@@ -301,6 +321,13 @@ final class OmacMenuPanel: NSPanel, NSSearchFieldDelegate {
         setContentSize(NSSize(width: panelWidth, height: height))
         position(on: screen, anchor: anchor ?? presentationAnchor)
         highlightSelected(scrollView: scroll)
+    }
+
+    private func refreshSearchResults() {
+        guard let current = levels.last, let stack = resultsStack, let scroll = resultsScroll else { return }
+        updateVisibleItems(current: current)
+        populateRows(in: stack)
+        resizeForResults(stack: stack, scroll: scroll, anchor: presentationAnchor)
     }
 
     private func makeHeader(title: String) -> NSView {
@@ -458,20 +485,9 @@ final class OmacMenuPanel: NSPanel, NSSearchFieldDelegate {
     }
 
     func controlTextDidChange(_ notification: Notification) {
-        guard !rebuildingForSearch else { return }
-        let selection = (searchField.currentEditor() as? NSTextView)?.selectedRange
         query = searchField.stringValue
         selectedPosition = 0
-        rebuildingForSearch = true
-        rebuild(anchor: presentationAnchor)
-        makeFirstResponder(searchField)
-        if let selection, let editor = searchField.currentEditor() as? NSTextView {
-            let length = (editor.string as NSString).length
-            let location = min(selection.location, length)
-            let selectedLength = min(selection.length, length - location)
-            editor.setSelectedRange(NSRange(location: location, length: selectedLength))
-        }
-        rebuildingForSearch = false
+        refreshSearchResults()
     }
 
     func control(_ control: NSControl, textView: NSTextView,
