@@ -7,6 +7,8 @@ sys.dont_write_bytecode=True
 from portable_paths import SOURCE as ROOT, STATE, RUNTIME, AERO, APP
 STATE.mkdir(parents=True,exist_ok=True)
 DOMAIN=f'gui/{os.getuid()}'
+REMOTE_VIEWER_APP='Screen Sharing'
+REMOTE_VIEWER_BUNDLE='com.apple.ScreenSharing'
 ROLES=[str(i) for i in range(1,31)]
 
 def run(*args,check=True):
@@ -28,7 +30,9 @@ def load(name):
  if p.returncode: run('launchctl','bootstrap',DOMAIN,RUNTIME/'launchd'/f'{name}.plist')
 
 def windows():
- return json.loads(aero('list-windows','--all','--format','%{window-id} %{app-pid} %{app-name} %{window-title} %{workspace} %{window-layout}','--json'))
+ return json.loads(aero('list-windows','--all','--format','%{window-id} %{app-pid} %{app-name} %{app-bundle-id} %{window-title} %{workspace} %{window-layout}','--json'))
+def is_remote_viewer(window):
+ return window.get('app-bundle-id')==REMOTE_VIEWER_BUNDLE or window.get('app-name')==REMOTE_VIEWER_APP
 def page():
  value=aero('list-workspaces','--focused').strip()
  return value if value in ('1','2','3','4','5') else '1'
@@ -38,7 +42,9 @@ def status():
  try: return (STATE/'status').read_text()
  except FileNotFoundError: return 'Inactive'
 def save_pages():
- current=windows()
+ # Screen Sharing is an opt-in handoff surface, not an Omac page window. If it
+ # is recorded here, recovery can move/layout it while restoring an empty page.
+ current=[w for w in windows() if not is_remote_viewer(w)]
  path=STATE/'pages.json'
  # AeroSpace temporarily reports an empty inventory while displays reconnect or
  # macOS hides/minimizes every window. Keep the last useful page assignment so
@@ -63,6 +69,7 @@ def restore_pages():
  commands=[]
  for w in data['windows']:
   if not isinstance(w,dict) or not isinstance(w.get('window-id'),int): continue
+  if is_remote_viewer(w): continue
   current=live.get(w['window-id'])
   if not current or current.get('app-pid')!=w.get('app-pid'): continue
   target=w.get('workspace')

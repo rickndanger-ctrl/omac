@@ -11,6 +11,7 @@ from portable_paths import AERO, STATE
 CONFIG = STATE / 'remote-control.json'
 RETURN_STATE = STATE / 'mac-switch-window.json'
 VIEWER_BUNDLE = 'com.apple.ScreenSharing'
+REMOTE_WORKSPACE = 'Omac-Remote'
 EXCLUDED_LAYOUTS = {'floating', 'macos_native_window_of_hidden_app', 'macos_fullscreen'}
 WINDOW_FORMAT = '%{window-id} %{app-pid} %{app-bundle-id} %{workspace} %{window-layout}'
 PAGES = {'1', '2', '3', '4', '5'}
@@ -45,7 +46,13 @@ def config():
 
 
 def rows(*scope):
-    value = json.loads(run(AERO, 'list-windows', *scope, '--format', WINDOW_FORMAT, '--json'))
+    try:
+        raw = run(AERO, 'list-windows', *scope, '--format', WINDOW_FORMAT, '--json')
+    except subprocess.CalledProcessError as exc:
+        if '--focused' in scope and 'No window is focused' in (exc.stderr or ''):
+            return []
+        raise
+    value = json.loads(raw)
     return value if isinstance(value, list) else []
 
 
@@ -129,7 +136,7 @@ def enter_remote():
     origin = focused_local()
     # Capture a local origin even if a viewer already exists behind it. Repeated
     # Enter while the viewer is focused preserves the prior return identity.
-    if origin:
+    if origin or not any(row.get('app-bundle-id') == VIEWER_BUNDLE for row in rows('--focused')):
         remember_return_target(current_page())
     if viewer is None:
         run('/usr/bin/open', str(saved))
@@ -148,8 +155,15 @@ def enter_remote():
 def leave_remote():
     target = remembered_return_target()
     page = target.get('page') if target.get('page') in PAGES else current_page()
+    viewer = visible_viewer()
     best_effort('/usr/bin/osascript', '-e',
                 'tell application "System Events" to set visible of process "Screen Sharing" to false')
+    park_error = None
+    if viewer and viewer.get('workspace') != REMOTE_WORKSPACE:
+        try:
+            run(AERO, 'move-node-to-workspace', '--window-id', str(viewer['window-id']), REMOTE_WORKSPACE)
+        except (OSError, subprocess.SubprocessError) as exc:
+            park_error = exc
     best_effort(AERO, 'workspace', page)
     live = rows('--workspace', page)
     exact = next((row for row in live if row.get('window-id') == target.get('window-id') and
@@ -159,6 +173,8 @@ def leave_remote():
         run(AERO, 'focus', '--window-id', str(chosen['window-id']))
     # Do not reuse a stale process/window identity after a completed return.
     RETURN_STATE.unlink(missing_ok=True)
+    if park_error:
+        raise RuntimeError('Screen Sharing returned locally but its viewer could not leave the Omac pages.') from park_error
 
 
 def main(choice):

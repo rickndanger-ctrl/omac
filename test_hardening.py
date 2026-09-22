@@ -19,6 +19,17 @@ class Hardening(unittest.TestCase):
   with patch.object(c,'boot_session',return_value='same'),patch.object(c,'windows',return_value=rows),patch.object(c,'aero'),patch.object(c,'arrange') as arrange:
    c.restore_pages()
    arrange.assert_called_once_with('1')
+ def test_screen_sharing_is_never_saved_or_restored_as_a_page_window(self):
+  remote={'window-id':5418,'app-pid':82697,'app-name':'Screen Sharing','workspace':'2','window-layout':'floating'}
+  terminal={'window-id':7,'app-pid':7,'app-name':'Ghostty','workspace':'1','window-layout':'h_tiles'}
+  with patch.object(c,'windows',return_value=[remote,terminal]),patch.object(c,'boot_session',return_value='same'),patch.object(c,'page',return_value='1'):
+   self.assertTrue(c.save_pages())
+  saved=json.loads((c.STATE/'pages.json').read_text())
+  self.assertEqual(saved['windows'],[terminal])
+  (c.STATE/'pages.json').write_text(json.dumps({'boot':'same','page':'1','windows':[remote]}))
+  with patch.object(c,'windows',return_value=[remote]),patch.object(c,'boot_session',return_value='same'),patch.object(c,'aero') as aero:
+   c.restore_pages()
+  self.assertEqual([item.args for item in aero.call_args_list],[('workspace','1')])
  def test_empty_inventory_does_not_erase_last_page_map(self):
   previous={'boot':'same','page':'1','windows':[{'window-id':1,'app-pid':2,'workspace':'1'}]}
   (c.STATE/'pages.json').write_text(json.dumps(previous))
