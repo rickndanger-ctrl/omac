@@ -105,7 +105,40 @@ func omacInstalledApplications() -> [(name:String,bundleID:String,url:URL)] {
 // A themed replacement for NSMenu popups. It deliberately consumes NSMenu as its
 // model so callers keep their existing targets, actions, icons, state, and enabled
 // rules instead of maintaining a second menu representation.
-final class OmacMenuPanel: NSPanel {
+struct OmacMenuSearchResult {
+    let item: NSMenuItem
+    let label: String
+}
+
+struct OmacMenuSearch {
+    static func results(in menu: NSMenu, query: String) -> [OmacMenuSearchResult] {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !needle.isEmpty else { return [] }
+        var found: [OmacMenuSearchResult] = []
+        collect(menu: menu, ancestors: [], query: needle, into: &found)
+        return found
+    }
+
+    private static func collect(menu: NSMenu, ancestors: [String], query: String,
+                                into found: inout [OmacMenuSearchResult]) {
+        for item in menu.items where !item.isHidden && !item.isSeparatorItem {
+            // A disabled parent makes its entire branch unavailable in NSMenu as well.
+            guard item.isEnabled else { continue }
+            let path = ancestors + [item.title]
+            if let submenu = item.submenu {
+                collect(menu: submenu, ancestors: path, query: query, into: &found)
+            } else if item.action != nil {
+                let searchable = path.joined(separator: " ")
+                if searchable.localizedCaseInsensitiveContains(query) {
+                    let context = ancestors.isEmpty ? "" : "  —  " + ancestors.joined(separator: " › ")
+                    found.append(OmacMenuSearchResult(item: item, label: item.title + context))
+                }
+            }
+        }
+    }
+}
+
+final class OmacMenuPanel: NSPanel, NSSearchFieldDelegate {
     private struct Level {
         let menu: NSMenu
         let title: String
@@ -113,13 +146,17 @@ final class OmacMenuPanel: NSPanel {
 
     private let panelWidth: CGFloat = 310
     private let rowHeight: CGFloat = 34
-    private let chromeHeight: CGFloat = 54
+    private let chromeHeight: CGFloat = 82
     private var levels: [Level] = []
     private var visibleItems: [NSMenuItem] = []
     private var selectableRows: [Int] = []
     private var rowButtons: [Int: NSButton] = [:]
+    private var rowLabels: [String] = []
     private var selectedPosition = 0
     private var didNotifyClose = false
+    private var query = ""
+    private var presentationAnchor: NSRect?
+    private let searchField = NSSearchField()
 
     /// Called once whenever a presented panel is dismissed or an action is chosen.
     var onClose: (() -> Void)?
@@ -148,9 +185,11 @@ final class OmacMenuPanel: NSPanel {
     func present(menu: NSMenu, anchor: NSRect? = nil) {
         levels = [Level(menu: menu, title: menu.title)]
         didNotifyClose = false
+        query = ""
+        presentationAnchor = anchor
         rebuild(anchor: anchor)
         makeKeyAndOrderFront(nil)
-        makeFirstResponder(nil)
+        makeFirstResponder(searchField)
     }
 
     func dismiss() {
@@ -161,10 +200,17 @@ final class OmacMenuPanel: NSPanel {
 
     private func rebuild(anchor: NSRect? = nil) {
         guard let current = levels.last else { return }
-        visibleItems = current.menu.items.filter { !$0.isHidden }
+        let searchResults = query.isEmpty ? [] : OmacMenuSearch.results(in: levels[0].menu, query: query)
+        if query.isEmpty {
+            visibleItems = current.menu.items.filter { !$0.isHidden }
+            rowLabels = visibleItems.map(\.title)
+        } else {
+            visibleItems = searchResults.map(\.item)
+            rowLabels = searchResults.map(\.label)
+        }
         selectableRows = visibleItems.indices.filter {
             let item = visibleItems[$0]
-            return !item.isSeparatorItem && item.isEnabled && (item.submenu != nil || item.action != nil)
+            return !item.isSeparatorItem && item.isEnabled && (query.isEmpty ? (item.submenu != nil || item.action != nil) : item.action != nil)
         }
         selectedPosition = selectableRows.isEmpty ? 0 : min(selectedPosition, selectableRows.count - 1)
         rowButtons.removeAll()
@@ -200,7 +246,7 @@ final class OmacMenuPanel: NSPanel {
                 continue
             }
 
-            let button = makeRow(for: item, index: index)
+            let button = makeRow(for: item, title: rowLabels[index], index: index)
             stack.addArrangedSubview(button)
             rowButtons[index] = button
         }
@@ -252,7 +298,7 @@ final class OmacMenuPanel: NSPanel {
         let maximumHeight = min(640, max(150, screen.visibleFrame.height - 32))
         let height = min(maximumHeight, chromeHeight + desiredRowsHeight)
         setContentSize(NSSize(width: panelWidth, height: height))
-        position(on: screen, anchor: anchor)
+        position(on: screen, anchor: anchor ?? presentationAnchor)
         highlightSelected(scrollView: scroll)
     }
 
@@ -264,6 +310,14 @@ final class OmacMenuPanel: NSPanel {
         label.textColor = NSColor(white: 0.94, alpha: 1)
         label.lineBreakMode = .byTruncatingTail
         view.addSubview(label)
+
+        searchField.translatesAutoresizingMaskIntoConstraints = false
+        searchField.placeholderString = "Search apps and controls"
+        searchField.sendsSearchStringImmediately = true
+        searchField.delegate = self
+        searchField.stringValue = query
+        searchField.focusRingType = .none
+        view.addSubview(searchField)
 
         if levels.count > 1 {
             let back = NSButton(title: "‹", target: self, action: #selector(goBack))
@@ -286,12 +340,16 @@ final class OmacMenuPanel: NSPanel {
 
         NSLayoutConstraint.activate([
             label.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -14),
-            label.centerYAnchor.constraint(equalTo: view.centerYAnchor)
+            label.topAnchor.constraint(equalTo: view.topAnchor, constant: 9),
+            searchField.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 10),
+            searchField.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -10),
+            searchField.topAnchor.constraint(equalTo: label.bottomAnchor, constant: 7),
+            searchField.heightAnchor.constraint(equalToConstant: 25)
         ])
         return view
     }
 
-    private func makeRow(for item: NSMenuItem, index: Int) -> NSButton {
+    private func makeRow(for item: NSMenuItem, title: String, index: Int) -> NSButton {
         let stateMark: String
         switch item.state {
         case .on: stateMark = "✓  "
@@ -299,7 +357,7 @@ final class OmacMenuPanel: NSPanel {
         default: stateMark = "    "
         }
         let submenuMark = item.submenu == nil ? "" : "   ›"
-        let button = NSButton(title: stateMark + item.title + submenuMark, target: self, action: #selector(chooseRow(_:)))
+        let button = NSButton(title: stateMark + title + submenuMark, target: self, action: #selector(chooseRow(_:)))
         button.tag = index
         button.translatesAutoresizingMaskIntoConstraints = false
         button.heightAnchor.constraint(equalToConstant: rowHeight).isActive = true
@@ -366,8 +424,9 @@ final class OmacMenuPanel: NSPanel {
         if let submenu = item.submenu {
             levels.append(Level(menu: submenu, title: item.title))
             selectedPosition = 0
-            rebuild()
-            makeFirstResponder(nil)
+            query = ""
+            rebuild(anchor: presentationAnchor)
+            makeFirstResponder(searchField)
             return
         }
         guard let action = item.action else { return }
@@ -380,8 +439,9 @@ final class OmacMenuPanel: NSPanel {
         guard levels.count > 1 else { return }
         levels.removeLast()
         selectedPosition = 0
-        rebuild()
-        makeFirstResponder(nil)
+        query = ""
+        rebuild(anchor: presentationAnchor)
+        makeFirstResponder(searchField)
     }
 
     private func moveSelection(by offset: Int) {
@@ -396,11 +456,34 @@ final class OmacMenuPanel: NSPanel {
         onClose?()
     }
 
+    func controlTextDidChange(_ notification: Notification) {
+        query = searchField.stringValue
+        selectedPosition = 0
+        rebuild(anchor: presentationAnchor)
+        makeFirstResponder(searchField)
+    }
+
+    func control(_ control: NSControl, textView: NSTextView,
+                 doCommandBy commandSelector: Selector) -> Bool {
+        switch commandSelector {
+        case #selector(NSResponder.moveUp(_:)):
+            moveSelection(by: -1); return true
+        case #selector(NSResponder.moveDown(_:)):
+            moveSelection(by: 1); return true
+        case #selector(NSResponder.insertNewline(_:)):
+            activateSelection(); return true
+        case #selector(NSResponder.cancelOperation(_:)):
+            dismiss(); return true
+        default:
+            return false
+        }
+    }
+
     override func keyDown(with event: NSEvent) {
         switch event.keyCode {
         case 53: dismiss()
         case 36, 76: activateSelection()
-        case 123, 51: goBack()
+        case 123, 51: if query.isEmpty { goBack() } else { super.keyDown(with: event) }
         case 124:
             guard selectableRows.indices.contains(selectedPosition) else { return }
             let item = visibleItems[selectableRows[selectedPosition]]
