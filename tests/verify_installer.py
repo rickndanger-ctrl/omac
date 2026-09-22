@@ -7,6 +7,8 @@ with tempfile.TemporaryDirectory(prefix='omac-install-test-') as folder:
  subprocess.run(['ditto',str(repo/'dist/staging/Omac.app'),str(source/'Omac.app')],check=True)
  for failing in (False,True):
   case=root/('failure' if failing else 'success');case.mkdir();state=case/'state';state.mkdir();(state/'sentinel').write_text('original')
+  settings={'wallpaper.selected':'pine','app-favorites.json':'{}','pages.json':'{"page":"4","windows":[]}'}
+  for name,value in settings.items():(state/name).write_text(value)
   target=case/'Applications/Omac.app';target.mkdir(parents=True);(target/'old-app-marker').write_text('original')
   saver=case/'savers';(saver/'OMAC.saver').mkdir(parents=True);(saver/'OMAC.saver/old-marker').write_text('original')
   if failing:(state/'runtime').write_text('force generator failure')
@@ -24,3 +26,5 @@ with tempfile.TemporaryDirectory(prefix='omac-install-test-') as folder:
    assert (state/'sentinel').read_text()=='original'
    assert (state/'runtime/launchd/menu.plist').is_file()
    print('SUCCESS INSTALL PASSED: relocated app and runtime ready')
+  for name,value in settings.items():assert (state/name).read_text()==value,name
+  print('USER SETTINGS PRESERVED')
