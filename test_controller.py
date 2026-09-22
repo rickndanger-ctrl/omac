@@ -121,6 +121,18 @@ class Pages(unittest.TestCase):
    batch=[x.args[1] for x in aero.call_args_list if x.args[0]=='eval'][0]
    self.assertNotIn('--window-id 1',batch)
    self.assertIn('workspace 2',batch)
+ def test_arrange_evacuates_remote_viewer_before_workspace_layout(self):
+  viewer={'app-name':'Screen Sharing','app-bundle-id':c.REMOTE_VIEWER_BUNDLE,
+          'window-id':5418,'workspace':'1','window-layout':'h_tiles'}
+  terminal={'app-name':'Ghostty','window-id':42,'workspace':'1',
+            'window-layout':'h_tiles','window-title':'ACC · 1'}
+  with patch.object(c,'windows',return_value=[viewer,terminal]), \
+       patch.object(c,'aero',return_value='1') as aero:
+   c.arrange('1')
+  self.assertIn(('move-node-to-workspace','--window-id','5418',c.REMOTE_WORKSPACE),
+                [call.args for call in aero.call_args_list])
+  batch=[call.args[1] for call in aero.call_args_list if call.args[0]=='eval'][0]
+  self.assertNotIn('5418',batch)
  def test_switch_page_evacuates_remote_viewer_from_empty_destination(self):
   viewer={'window-id':5418,'app-name':'Screen Sharing','app-bundle-id':c.REMOTE_VIEWER_BUNDLE,'workspace':'2'}
   def fake_aero(*args): return '1' if args==('list-workspaces','--focused') else ''

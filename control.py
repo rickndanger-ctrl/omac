@@ -275,11 +275,21 @@ def switch_page(target):
  # An empty destination page would otherwise focus a parked Screen Sharing
  # viewer as soon as AeroSpace activates that workspace.
  if target!=current:
-  for window in windows():
-   if is_remote_viewer(window) and window.get('workspace')==target:
-    aero('move-node-to-workspace','--window-id',str(window['window-id']),REMOTE_WORKSPACE)
+  evacuate_remote_viewers(target)
  aero('workspace',target)
  return f'Switched to page {target}.'
+
+def evacuate_remote_viewers(workspace):
+ """Keep Screen Sharing out of Omac's five page tile trees.
+
+ The workspace-wide layout commands used by ``arrange`` operate on every
+ node in the workspace, even when the caller's tile list excludes the viewer.
+ Move remote viewers first so an already-tiled viewer cannot be reintroduced
+ into an otherwise local page during a page switch or re-arrange.
+ """
+ for window in windows():
+  if is_remote_viewer(window) and window.get('workspace')==workspace:
+   aero('move-node-to-workspace','--window-id',str(window['window-id']),REMOTE_WORKSPACE)
 def move_focused_to_page(target):
  if target not in ('1','2','3','4','5'): raise RuntimeError('Page must be 1 through 5.')
  focused=json.loads(aero('list-windows','--focused','--format','%{window-id} %{app-pid} %{workspace}','--json'))
@@ -464,6 +474,7 @@ def running_terminal_source():
 
 def arrange(workspace=None):
  workspace=workspace or page()
+ evacuate_remote_viewers(workspace)
  terminal_count=len(terminal_windows(workspace))
  # Include native apps in the same tile tree. Pair adjacent windows into
  # rectangular tiles instead of letting each new app become a tall column.
