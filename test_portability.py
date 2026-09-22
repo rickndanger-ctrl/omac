@@ -20,6 +20,8 @@ class Portability(unittest.TestCase):
    self.assertEqual(job['EnvironmentVariables']['PYTHONDONTWRITEBYTECODE'],'1')
    watcher=plistlib.loads((state/'runtime/launchd/watcher.plist').read_bytes())
    self.assertEqual(watcher['ProgramArguments'],[sys.executable,str(payload/'watcher.py')])
+   terminal=plistlib.loads((state/'runtime/launchd/terminal.1.plist').read_bytes())
+   self.assertEqual(terminal['ProgramArguments'][:5],['/usr/bin/open','-g','-W','-n','-a'])
    # No original checkout or user's account directory may leak into generated jobs.
    for file in (state/'runtime/launchd').glob('*.plist'):
     self.assertNotIn(str(source),file.read_text())
