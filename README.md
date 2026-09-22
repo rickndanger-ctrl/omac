@@ -54,3 +54,7 @@ For a Mac with stable named monitors, an optional `~/Library/Application Support
 ```
 
 Only page keys `"1"` through `"5"` with non-empty monitor names are generated. This host-local file is preserved by upgrades and is ignored when absent or malformed; it never makes a default install target a particular display.
+
+## License
+
+Omac is licensed under the GNU General Public License version 3 only (GPL-3.0-only). See [LICENSE](LICENSE). Copyright (c) 2026 Richard Holguin and contributors. Third-party components retain their own licenses.

@@ -36,6 +36,7 @@ displays), shortcut, expected behavior, and what happened. Say whether input cam
 from the Mac's own keyboard or Screen Sharing. Remove personal window titles,
 connection files, credentials, and private paths before sharing diagnostics.
 
-Maintainers review contributions before including them in a release. Downloading
-or sharing source does not by itself establish a license; follow the repository's
-published license and ask the maintainer if one has not been chosen.
+Maintainers review contributions before including them in a release. Contributions
+are provided under GPL-3.0-only, the same license as Omac. Contributors retain
+copyright in their contributions; submitting a contribution does not transfer
+ownership. Only contribute material you have the right to license this way.

@@ -30,6 +30,7 @@ cp branding/Omac.icns "$app/Contents/Resources/"
 cp tile_modes.py control.py watcher.py portable_paths.py generate_config.py mac_switch.py Guide.html "$app/Contents/Resources/Payload/"
 cp config/ghostty.conf "$app/Contents/Resources/Payload/config/"
 cp branding/wallpapers/omac-{obsidian,amber,pine,emerald-glass,storm-forge,crimson-etch}.png "$app/Contents/Resources/Payload/branding/wallpapers/"
+cp LICENSE "$app/Contents/Resources/LICENSE"
 branding/screensaver/build.sh
 cp -R branding/screensaver/build/OMAC.saver branding/screensaver/build/OMAC-Preview.app "$app/Contents/Resources/Extras/"
 for bundle in "$app/Contents/Resources/Extras/OMAC.saver" "$app/Contents/Resources/Extras/OMAC-Preview.app" "$app"; do
@@ -37,6 +38,7 @@ for bundle in "$app/Contents/Resources/Extras/OMAC.saver" "$app/Contents/Resourc
  codesign --verify --deep --strict "$bundle"
 done
 cp DISTRIBUTION.md "$stage/START HERE.md"
+cp LICENSE "$stage/LICENSE"
 cp "Install Omac.command" "$stage/Install Omac.command"
 chmod +x "$stage/Install Omac.command"
 ln -s /Applications "$stage/Applications"
