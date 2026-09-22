@@ -41,4 +41,9 @@ class Hardening(unittest.TestCase):
    with self.assertRaises(RuntimeError):c.recover()
    aero.assert_any_call('mode','main',check=False);aero.assert_any_call('enable','off',check=False)
   self.assertEqual(c.status(),'Paused')
+ def test_package_prefers_a_stable_development_signature(self):
+  script=Path('package.sh').read_text()
+  self.assertIn('security find-identity -v -p codesigning',script)
+  self.assertIn('Apple Development:',script)
+  self.assertIn('OMAC_SIGN_IDENTITY',script)
 if __name__=='__main__':unittest.main()

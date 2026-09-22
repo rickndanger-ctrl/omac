@@ -3,7 +3,11 @@
 set -euo pipefail
 cd "${0:A:h}"
 python_cmd="${OMAC_BUILD_PYTHON:-$(command -v python3)}"
-identity="${OMAC_SIGN_IDENTITY:--}"
+identity="${OMAC_SIGN_IDENTITY:-}"
+if [[ -z "$identity" ]]; then
+ identity="$(security find-identity -v -p codesigning | sed -n 's/.*"\(Apple Development:.*\)"/\1/p' | head -n 1)"
+fi
+identity="${identity:--}"
 version=1.2.0-preview
 arch="$(uname -m)"
 out="$PWD/dist"
