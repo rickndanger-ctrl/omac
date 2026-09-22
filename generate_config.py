@@ -92,6 +92,7 @@ run = 'layout floating'
 if = 'test %{app-bundle-id} = com.richardholguin.omac.preview'
 run = 'layout floating'
 '''
+config=config.replace("open -g 'agent-control-center://", "open -g -a /Applications/Omac.app 'agent-control-center://")
 lines=config.splitlines()
 for i,line in enumerate(lines):
  if line.startswith('after-startup-command ='):
