@@ -130,3 +130,12 @@ The daily launcher was updated in place after committing its changes, with the p
 
 ### Mini 2 shelf installation — September 21 afternoon
 Compiled the committed portable shelf launcher, backed up the remote app and runtime in Documents/Omac-backups, then updated the executable and payload. Ad-hoc signature validation passed; --check reported Accessibility true, no missing dependencies, and login registered. Runtime regeneration and AeroSpace dry-run/reload passed. Restarted only the launchd menu helper; it is running and existing Ghostty processes remain. Screen Sharing explicitly reports Locked, so physical keyboard, selector appearance, and cross-page shelf recall are pending unlock. No lock or iPhone Mirroring setting changed.
+
+
+### Native-width presets and compact terminal setup
+- Added explicit one-third, half, and two-thirds native-app widths beside two or three terminals. Existing half-width shortcuts remain unchanged; choices are in Mixed Layout. Restore the active mixed layout before changing presets.
+- Menu captures exact window ID/PID before focus changes. Presets and expand/return revalidate identity; missing target refuses. Keyboard commands use their current focus.
+- Mini 1 real ChatGPT plus two Ghostty windows passed one-third and two-thirds application and exact frame restoration. Production checkpoint was unchanged.
+- Matching signed helper installed/running on both Macs. Mini 1 menu visibly exposes all six size/count combinations. Mini 2 physical test is deferred at the user's request.
+- Ghostty hidden mode configured for new Omac terminals. Existing terminal reload remains pending: CUA access to Ghostty was rejected; do not bypass that boundary or restart user sessions. Automatic macOS keyboard-layout switching is disabled by Ghostty hidden mode.
+- Optional additional app windows remain an uninstalled prototype, deferred by the user.
