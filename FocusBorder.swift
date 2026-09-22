@@ -48,6 +48,7 @@ final class FocusBorderController {
     private var workspaceTokens: [NSObjectProtocol] = []
     private var appObserver: AXObserver?
     private var windowObserver: AXObserver?
+    private var observedPID: pid_t?
     private var observedWindow: AXUIElement?
     private(set) var isEngaged = false
     private(set) var isEnabled = true
@@ -116,21 +117,29 @@ final class FocusBorderController {
         }
         appObserver = nil
         windowObserver = nil
+        observedPID = nil
         observedWindow = nil
     }
 
     private func observeFrontmostApplication() {
-        guard isEngaged, isEnabled,
-              let app = NSWorkspace.shared.frontmostApplication,
-              app.processIdentifier != ProcessInfo.processInfo.processIdentifier,
+        followFocusedApplication(pid: NSWorkspace.shared.frontmostApplication?.processIdentifier)
+    }
+
+    /// AeroSpace can focus a tile while macOS still calls another app frontmost.
+    /// Prefer that exact tiled app so the outline follows Omac's keyboard focus.
+    func followFocusedApplication(pid: pid_t?) {
+        guard isEngaged, isEnabled, let pid,
+              let app = NSRunningApplication(processIdentifier: pid),
+              pid != ProcessInfo.processInfo.processIdentifier,
               !Self.excludedBundleIdentifiers.contains(app.bundleIdentifier ?? "") else {
             panel.orderOut(nil); return
         }
-
+        if observedPID == pid, observedWindow != nil { observeFocusedWindow(); return }
         stopObserving()
-        let application = AXUIElementCreateApplication(app.processIdentifier)
+        observedPID = pid
+        let application = AXUIElementCreateApplication(pid)
         var observer: AXObserver?
-        guard AXObserverCreate(app.processIdentifier, focusBorderAXCallback, &observer) == .success,
+        guard AXObserverCreate(pid, focusBorderAXCallback, &observer) == .success,
               let observer else { panel.orderOut(nil); return }
         appObserver = observer
         AXObserverAddNotification(observer, application, kAXFocusedWindowChangedNotification as CFString,
@@ -159,7 +168,7 @@ final class FocusBorderController {
         let window = unsafeBitCast(value, to: AXUIElement.self)
         observedWindow = window
 
-        if let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier {
+        if let pid = observedPID {
             var observer: AXObserver?
             if AXObserverCreate(pid, focusBorderAXCallback, &observer) == .success, let observer {
                 windowObserver = observer

@@ -435,10 +435,15 @@ class Delegate: NSObject,NSApplicationDelegate {
   guard !barRefreshing else {return};barRefreshing=true
   DispatchQueue.global(qos:.utility).async {
    let result=process(aerospace ?? "/missing/aerospace",["list-workspaces","--focused"])
+   let focused=process(aerospace ?? "/missing/aerospace",["list-windows","--focused","--format","%{app-pid}"])
+   let focusedPID=pid_t(focused.1.trimmingCharacters(in:.whitespacesAndNewlines))
    let page=Int(result.1.trimmingCharacters(in:.whitespacesAndNewlines)) ?? 0
    let status=(try? String(contentsOf:state.appendingPathComponent("status"),encoding:.utf8)) ?? "Inactive"
    DispatchQueue.main.async {
     self.barRefreshing=false
+    let engaged=status=="Active"
+    if self.focusBorder.isEngaged != engaged { self.focusBorder.setEngaged(engaged) }
+    if engaged { self.focusBorder.followFocusedApplication(pid:focusedPID) }
     self.refreshShelf()
     self.item.button?.title=""
     self.item.button?.image=self.brandBar.image(page:page,status:status)
