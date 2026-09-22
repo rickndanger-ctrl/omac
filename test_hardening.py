@@ -12,13 +12,21 @@ class Hardening(unittest.TestCase):
  def test_previous_boot_does_not_move_reused_ids(self):
   (c.STATE/'pages.json').write_text(json.dumps({'boot':'old','page':'2','windows':[{'window-id':1,'app-pid':1,'workspace':'2'}]}))
   with patch.object(c,'boot_session',return_value='new'),patch.object(c,'aero') as aero:c.restore_pages();aero.assert_not_called()
- def test_hidden_app_does_not_prevent_terminal_grid_recovery(self):
+ def test_restore_skips_same_page_move_and_hidden_window_layout(self):
+  saved=[{'window-id':7,'app-pid':70,'workspace':'1','app-name':'Ghostty','window-layout':'h_tiles'},
+         {'window-id':8,'app-pid':80,'workspace':'1','app-name':'Ghostty','window-layout':'h_tiles'}]
+  live=[dict(saved[0]),dict(saved[1],**{'window-layout':'macos_native_window_of_hidden_app'})]
+  (c.STATE/'pages.json').write_text(json.dumps({'boot':'same','page':'1','windows':saved}))
+  with patch.object(c,'boot_session',return_value='same'),patch.object(c,'windows',return_value=live),patch.object(c,'aero') as aero:
+   c.restore_pages()
+  self.assertEqual([call.args for call in aero.call_args_list],[('workspace','1')])
+ def test_same_page_tiles_and_hidden_app_do_not_trigger_rearrange(self):
   rows=[{'window-id':i,'app-pid':i,'workspace':'1','app-name':'Ghostty','window-layout':'v_tiles'} for i in range(1,5)]
   rows.append({'window-id':9,'app-pid':9,'workspace':'1','app-name':'Messages','window-layout':'macos_native_window_of_hidden_app'})
   (c.STATE/'pages.json').write_text(json.dumps({'boot':'same','page':'1','windows':rows}))
   with patch.object(c,'boot_session',return_value='same'),patch.object(c,'windows',return_value=rows),patch.object(c,'aero'),patch.object(c,'arrange') as arrange:
    c.restore_pages()
-   arrange.assert_called_once_with('1')
+   arrange.assert_not_called()
  def test_screen_sharing_is_never_saved_or_restored_as_a_page_window(self):
   remote={'window-id':5418,'app-pid':82697,'app-name':'Screen Sharing','workspace':'2','window-layout':'floating'}
   terminal={'window-id':7,'app-pid':7,'app-name':'Ghostty','workspace':'1','window-layout':'h_tiles'}

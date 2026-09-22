@@ -74,9 +74,17 @@ def restore_pages():
   if not current or current.get('app-pid')!=w.get('app-pid'): continue
   target=w.get('workspace')
   if target not in ('1','2','3','4','5'): continue
-  commands.append(f"move-node-to-workspace --window-id {w['window-id']} {target}")
-  layout='floating' if w.get('window-layout')=='floating' else 'h_tiles'
-  commands.append(f"layout --window-id {w['window-id']} {layout}")
+  # macOS can expose a hidden/fullscreen app as a non-tiling window during
+  # restart. AeroSpace rejects both moving it and applying a tile layout.
+  current_layout=current.get('window-layout')
+  if current_layout in ('macos_native_window_of_hidden_app','macos_fullscreen'): continue
+  if current.get('workspace')!=target:
+   commands.append(f"move-node-to-workspace --window-id {w['window-id']} {target}")
+  recorded=w.get('window-layout')
+  if recorded=='floating' and current_layout!='floating':
+   commands.append(f"layout --window-id {w['window-id']} floating")
+  elif recorded in ('h_tiles','v_tiles','tiles','tiling') and current_layout=='floating':
+   commands.append(f"layout --window-id {w['window-id']} h_tiles")
  if commands:
   aero('eval','; '.join(commands))
   for workspace in ('1','2','3','4','5'):
