@@ -522,22 +522,34 @@ class Delegate: NSObject,NSApplicationDelegate {
  }
  @objc func toggleAnimatedWallpaper(_ sender:NSMenuItem) {
   let enable=sender.state != .on
-  setAnimatedWallpaper(enable)
-  sender.state = enable ? .on:.off
+  sender.isEnabled=false
+  DispatchQueue.global().async {
+   let actual=self.setAnimatedWallpaper(enable)
+   DispatchQueue.main.async {sender.state=actual ? .on:.off;sender.isEnabled=true}
+  }
  }
- func setAnimatedWallpaper(_ enable:Bool) {
+ @discardableResult func setAnimatedWallpaper(_ enable:Bool)->Bool {
   let domain="gui/\(getuid())",label="com.richard.omac.wallpaper"
   let plist=NSHomeDirectory()+"/Library/LaunchAgents/\(label).plist"
   let marker=state.appendingPathComponent("animated-wallpaper.disabled")
   if enable {
-   try? FileManager.default.removeItem(at:marker)
    _=process("/bin/launchctl",["enable",domain+"/"+label])
-   let loaded=process("/bin/launchctl",["bootstrap",domain,plist])
-   if loaded.0 != 0 {_=process("/bin/launchctl",["kickstart","-k",domain+"/"+label])}
+   for _ in 0..<5 {
+    if process("/bin/launchctl",["print",domain+"/"+label]).0==0 {try? FileManager.default.removeItem(at:marker);return true}
+    _=process("/bin/launchctl",["bootstrap",domain,plist])
+    _=process("/bin/launchctl",["kickstart","-k",domain+"/"+label])
+    Thread.sleep(forTimeInterval:0.2)
+   }
+   FileManager.default.createFile(atPath:marker.path,contents:Data());return false
   } else {
    FileManager.default.createFile(atPath:marker.path,contents:Data())
    _=process("/bin/launchctl",["disable",domain+"/"+label])
    _=process("/bin/launchctl",["bootout",domain+"/"+label])
+   for _ in 0..<5 {
+    if process("/bin/launchctl",["print",domain+"/"+label]).0 != 0 {return false}
+    Thread.sleep(forTimeInterval:0.2)
+   }
+   return true
   }
  }
  func applicationWillTerminate(_ notification:Notification) {focusBorder.setEngaged(false)}
