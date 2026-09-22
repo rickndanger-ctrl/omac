@@ -152,18 +152,31 @@ def enter_remote():
     park_remote_viewer()
 
 
+def release_to_local_app(pid):
+    """Release remote keyboard focus without activating a stale page."""
+    pid = int(pid)
+    run('/usr/bin/osascript', '-e', f'''tell application "System Events"
+    set localName to name of first application process whose unix id is {pid}
+    set frontmost of application process localName to true
+    set visible of process "Screen Sharing" to false
+end tell''')
+
+
+def release_to_empty_page():
+    # Finder owns the desktop but adds no window to Omac's tile inventory.
+    run('/usr/bin/osascript', '-e', '''tell application "System Events"
+    set frontmost of application process "Finder" to true
+    set visible of process "Screen Sharing" to false
+end tell''')
+
+
 def leave_remote():
     target = remembered_return_target()
     page = target.get('page') if target.get('page') in PAGES else current_page()
     viewer = visible_viewer()
-    best_effort('/usr/bin/osascript', '-e',
-                'tell application "System Events" to set visible of process "Screen Sharing" to false')
-    park_error = None
-    if viewer and viewer.get('workspace') != REMOTE_WORKSPACE:
-        try:
-            run(AERO, 'move-node-to-workspace', '--window-id', str(viewer['window-id']), REMOTE_WORKSPACE)
-        except (OSError, subprocess.SubprocessError) as exc:
-            park_error = exc
+    # Select the local page and target while Screen Sharing still owns focus.
+    # Hiding first lets macOS activate an arbitrary old window before the saved
+    # page is restored, which is the visible Codex flash.
     best_effort(AERO, 'workspace', page)
     live = rows('--workspace', page)
     exact = next((row for row in live if row.get('window-id') == target.get('window-id') and
@@ -171,10 +184,25 @@ def leave_remote():
     chosen = exact or next((row for row in live if eligible_local(row)), None)
     if chosen:
         run(AERO, 'focus', '--window-id', str(chosen['window-id']))
-    # Do not reuse a stale process/window identity after a completed return.
-    RETURN_STATE.unlink(missing_ok=True)
+    park_error = None
+    if viewer and viewer.get('workspace') != REMOTE_WORKSPACE:
+        try:
+            run(AERO, 'move-node-to-workspace', '--window-id', str(viewer['window-id']), REMOTE_WORKSPACE)
+        except (OSError, subprocess.SubprocessError) as exc:
+            park_error = exc
     if park_error:
         raise RuntimeError('Screen Sharing returned locally but its viewer could not leave the Omac pages.') from park_error
+    # Activation and hide must happen in one UI transaction. A plain hide
+    # activates whichever app macOS last used, even if it lives on page 5.
+    if chosen:
+        release_to_local_app(chosen['app-pid'])
+    else:
+        release_to_empty_page()
+    best_effort(AERO, 'workspace', page)
+    if chosen:
+        run(AERO, 'focus', '--window-id', str(chosen['window-id']))
+    # Do not reuse a stale process/window identity after a completed return.
+    RETURN_STATE.unlink(missing_ok=True)
 
 
 def main(choice):

@@ -59,6 +59,10 @@ class MacSwitchTests(unittest.TestCase):
              patch.object(switch, 'run', side_effect=lambda *a: calls.append(a) or ''):
             switch.main('local')
         self.assertIn((switch.AERO, 'focus', '--window-id', '42'), calls)
+        release = next(call for call in calls if call[:2] == ('/usr/bin/osascript', '-e'))
+        self.assertIn('whose unix id is 9', release[2])
+        self.assertLess(release[2].index('set frontmost'), release[2].index('set visible'))
+        self.assertEqual(calls[-1], (switch.AERO, 'focus', '--window-id', '42'))
         self.assertFalse(return_state.exists())
 
     def test_empty_page_return_parks_viewer_outside_omac_pages(self):
@@ -74,6 +78,9 @@ class MacSwitchTests(unittest.TestCase):
             switch.main('local')
         self.assertIn((switch.AERO,'move-node-to-workspace','--window-id','77',switch.REMOTE_WORKSPACE),calls)
         self.assertIn((switch.AERO,'workspace','1'),calls)
+        release = next(call for call in calls if call[:2] == ('/usr/bin/osascript', '-e'))
+        self.assertIn('application process "Finder"', release[2])
+        self.assertLess(release[2].index('set frontmost'), release[2].index('set visible'))
         self.assertFalse(return_state.exists())
 
     def test_no_focused_window_is_an_empty_inventory(self):
