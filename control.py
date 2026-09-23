@@ -323,7 +323,15 @@ def switch_page(target):
 def evacuate_page_remote_viewers():
  for window in windows():
   if is_remote_viewer(window) and window.get('workspace') in ('1','2','3','4','5'):
-   aero('move-node-to-workspace','--window-id',str(window['window-id']),REMOTE_WORKSPACE)
+   _park_remote_viewer(window)
+
+def _park_remote_viewer(window):
+ wid=str(window['window-id'])
+ aero('move-node-to-workspace','--window-id',wid,REMOTE_WORKSPACE)
+ # Moving a hidden Screen Sharing window can make AeroSpace assign it the
+ # destination's default tiled layout. Keep the isolated viewer floating so
+ # it cannot become a tile if the remote workspace is shown or reused.
+ aero('layout','--window-id',wid,'floating',check=False)
 
 def evacuate_remote_viewers(workspace):
  """Keep Screen Sharing out of Omac's five page tile trees.
@@ -335,7 +343,7 @@ def evacuate_remote_viewers(workspace):
  """
  for window in windows():
   if is_remote_viewer(window) and window.get('workspace')==workspace:
-   aero('move-node-to-workspace','--window-id',str(window['window-id']),REMOTE_WORKSPACE)
+   _park_remote_viewer(window)
 def move_focused_to_page(target):
  if target not in ('1','2','3','4','5'): raise RuntimeError('Page must be 1 through 5.')
  focused=json.loads(aero('list-windows','--focused','--format','%{window-id} %{app-pid} %{app-name} %{app-bundle-id} %{workspace}','--json'))

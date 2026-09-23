@@ -140,25 +140,45 @@ class Pages(unittest.TestCase):
    c.arrange('1')
   self.assertIn(('move-node-to-workspace','--window-id','5418',c.REMOTE_WORKSPACE),
                 [call.args for call in aero.call_args_list])
+  self.assertIn(('layout','--window-id','5418','floating'),
+                [call.args for call in aero.call_args_list])
   batch=[call.args[1] for call in aero.call_args_list if call.args[0]=='eval'][0]
   self.assertNotIn('5418',batch)
  def test_switch_page_evacuates_viewers_from_departing_and_empty_destination_pages(self):
   departing={'window-id':5418,'app-name':'Screen Sharing','app-bundle-id':c.REMOTE_VIEWER_BUNDLE,'workspace':'1'}
   destination={'window-id':5419,'app-name':'Screen Sharing','app-bundle-id':c.REMOTE_VIEWER_BUNDLE,'workspace':'2'}
-  def fake_aero(*args): return '1' if args==('list-workspaces','--focused') else ''
+  def fake_aero(*args,**kwargs): return '1' if args==('list-workspaces','--focused') else ''
   with patch.object(c,'aero',side_effect=fake_aero) as aero,patch.object(c,'windows',return_value=[departing,destination]):
    self.assertEqual(c.switch_page('2'),'Switched to page 2.')
   calls=[call.args for call in aero.call_args_list]
   self.assertEqual(calls[0],('list-workspaces','--focused'))
   self.assertEqual(calls[-1],('workspace','2'))
-  self.assertEqual(set(calls[1:-1]),{
+  for wid in ('5418','5419'):
+   move=('move-node-to-workspace','--window-id',wid,c.REMOTE_WORKSPACE)
+   floating=('layout','--window-id',wid,'floating')
+   self.assertLess(calls.index(move),calls.index(floating))
+  self.assertEqual([entry for entry in calls if entry[0]=='move-node-to-workspace'],[
    ('move-node-to-workspace','--window-id','5418',c.REMOTE_WORKSPACE),
-   ('move-node-to-workspace','--window-id','5419',c.REMOTE_WORKSPACE)})
+   ('move-node-to-workspace','--window-id','5419',c.REMOTE_WORKSPACE)])
+ def test_switching_from_empty_page_parks_hidden_viewer_as_floating(self):
+  # AeroSpace can relabel a hidden Screen Sharing window as tiled when it is
+  # moved. Reassert floating after the move so it cannot enter a later page's
+  # tile tree.
+  viewer={'window-id':5418,'app-name':'Screen Sharing','app-bundle-id':c.REMOTE_VIEWER_BUNDLE,
+          'workspace':'1','window-layout':'macos_native_window_of_hidden_app'}
+  def fake_aero(*args,**kwargs): return '1' if args==('list-workspaces','--focused') else ''
+  with patch.object(c,'aero',side_effect=fake_aero) as aero,patch.object(c,'windows',return_value=[viewer]):
+   c.switch_page('2')
+  calls=[call.args for call in aero.call_args_list]
+  move=('move-node-to-workspace','--window-id','5418',c.REMOTE_WORKSPACE)
+  floating=('layout','--window-id','5418','floating')
+  self.assertLess(calls.index(move),calls.index(floating))
+  self.assertEqual(calls[-1],('workspace','2'))
  def test_all_five_pages_and_same_page_evacuate_remote_before_activation(self):
   for origin in map(str,range(1,6)):
    for target in map(str,range(1,6)):
     viewer={'window-id':5418,'app-name':'Screen Sharing','app-bundle-id':c.REMOTE_VIEWER_BUNDLE,'workspace':origin}
-    def fake_aero(*args): return origin if args==('list-workspaces','--focused') else ''
+    def fake_aero(*args,**kwargs): return origin if args==('list-workspaces','--focused') else ''
     with self.subTest(origin=origin,target=target),patch.object(c,'aero',side_effect=fake_aero) as aero,patch.object(c,'windows',return_value=[viewer]):
      c.switch_page(target)
      self.assertLess(aero.call_args_list.index(next(call for call in aero.call_args_list if call.args[0]=='move-node-to-workspace')),
