@@ -35,6 +35,7 @@ class MacSwitchTests(unittest.TestCase):
             switch.main('remote')
         self.assertEqual(json.loads((self.state/'return.json').read_text()), {'page':'2','window-id':42,'app-pid':9})
         self.assertIn((switch.AERO, 'move-node-to-workspace', '--window-id', '77', '2'), calls)
+        self.assertIn((switch.AERO, 'workspace', '2'), calls)
 
     def test_repeated_remote_does_not_overwrite_return_target(self):
         return_state = self.state/'return.json'

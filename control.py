@@ -272,12 +272,17 @@ def switch_page(target):
   if data.get('workspace')!=current:
    if target!=data.get('workspace'): raise RuntimeError(f"Mixed layout is still recorded on page {data.get('workspace')}. Return there and restore it before switching pages.")
   else:_restore_mixed_data(data)
- # An empty destination page would otherwise focus a parked Screen Sharing
- # viewer as soon as AeroSpace activates that workspace.
+ # Clear both the departing remote-control page and any stale destination.
+ # Otherwise an empty page can focus the parked viewer on activation.
  if target!=current:
-  evacuate_remote_viewers(target)
+  evacuate_page_remote_viewers()
  aero('workspace',target)
  return f'Switched to page {target}.'
+
+def evacuate_page_remote_viewers():
+ for window in windows():
+  if is_remote_viewer(window) and window.get('workspace') in ('1','2','3','4','5'):
+   aero('move-node-to-workspace','--window-id',str(window['window-id']),REMOTE_WORKSPACE)
 
 def evacuate_remote_viewers(workspace):
  """Keep Screen Sharing out of Omac's five page tile trees.

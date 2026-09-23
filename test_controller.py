@@ -133,15 +133,18 @@ class Pages(unittest.TestCase):
                 [call.args for call in aero.call_args_list])
   batch=[call.args[1] for call in aero.call_args_list if call.args[0]=='eval'][0]
   self.assertNotIn('5418',batch)
- def test_switch_page_evacuates_remote_viewer_from_empty_destination(self):
-  viewer={'window-id':5418,'app-name':'Screen Sharing','app-bundle-id':c.REMOTE_VIEWER_BUNDLE,'workspace':'2'}
+ def test_switch_page_evacuates_viewers_from_departing_and_empty_destination_pages(self):
+  departing={'window-id':5418,'app-name':'Screen Sharing','app-bundle-id':c.REMOTE_VIEWER_BUNDLE,'workspace':'1'}
+  destination={'window-id':5419,'app-name':'Screen Sharing','app-bundle-id':c.REMOTE_VIEWER_BUNDLE,'workspace':'2'}
   def fake_aero(*args): return '1' if args==('list-workspaces','--focused') else ''
-  with patch.object(c,'aero',side_effect=fake_aero) as aero,patch.object(c,'windows',return_value=[viewer]):
+  with patch.object(c,'aero',side_effect=fake_aero) as aero,patch.object(c,'windows',return_value=[departing,destination]):
    self.assertEqual(c.switch_page('2'),'Switched to page 2.')
-  self.assertEqual([call.args for call in aero.call_args_list],[
-   ('list-workspaces','--focused'),
+  calls=[call.args for call in aero.call_args_list]
+  self.assertEqual(calls[0],('list-workspaces','--focused'))
+  self.assertEqual(calls[-1],('workspace','2'))
+  self.assertEqual(set(calls[1:-1]),{
    ('move-node-to-workspace','--window-id','5418',c.REMOTE_WORKSPACE),
-   ('workspace','2')])
+   ('move-node-to-workspace','--window-id','5419',c.REMOTE_WORKSPACE)})
  def test_restore_rejects_recycled_window_ids(self):
   import json
   with tempfile.TemporaryDirectory() as directory,patch.object(c,'STATE',Path(directory)):

@@ -149,6 +149,8 @@ def enter_remote():
         viewer = wait_for_viewer()
     destination = current_page()
     window_id = str(viewer['window-id'])
+    # Keep the viewer on the origin page while controlling the remote Mac so
+    # the local return shortcut remains interceptable.
     if viewer.get('workspace') != destination:
         run(AERO, 'move-node-to-workspace', '--window-id', window_id, destination)
     best_effort(AERO, 'layout', '--window-id', window_id, 'floating')
