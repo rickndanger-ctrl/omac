@@ -25,7 +25,9 @@ def main():
      except BlockingIOError:
       pending=time.monotonic()+0.3;continue
      try:
-      if c.status()=='Active': c.save_pages()
+      if c.status()=='Active':
+       c.reconcile_page_recovery()
+       c.save_pages()
      except (RuntimeError,ValueError,OSError): pass
  finally:
   selector.close()

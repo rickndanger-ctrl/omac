@@ -70,9 +70,45 @@ class Hardening(unittest.TestCase):
   with patch.object(c,'windows',return_value=[]),patch.object(c,'boot_session',return_value='new'),patch.object(c,'page',return_value='1'):
    self.assertTrue(c.save_pages())
   self.assertEqual(json.loads((c.STATE/'pages.json').read_text())['windows'],[])
+ def test_partial_startup_inventory_cannot_replace_transition_map(self):
+  rows=[{'window-id':i,'app-pid':100+i,'workspace':str(i),'app-name':'Ghostty','window-layout':'h_tiles'} for i in (1,2,3)]
+  (c.STATE/'pages.json').write_text(json.dumps({'boot':'same','page':'2','windows':rows}))
+  with patch.object(c,'boot_session',return_value='same'):
+   c.begin_page_recovery()
+   with patch.object(c,'windows',return_value=[rows[0]]),patch.object(c,'page',return_value='3'):
+    self.assertTrue(c.save_pages())
+  backup=json.loads((c.STATE/'pages.recovery.json').read_text())
+  self.assertEqual(backup['windows'],rows)
+  self.assertEqual(len(json.loads((c.STATE/'pages.json').read_text())['windows']),1)
+ def test_recovery_map_reconciles_late_window_then_releases(self):
+  rows=[{'window-id':i,'app-pid':100+i,'workspace':str(i),'app-name':'Ghostty','window-layout':'h_tiles'} for i in (1,2)]
+  (c.STATE/'pages.json').write_text(json.dumps({'boot':'same','page':'1','windows':rows}))
+  with patch.object(c,'boot_session',return_value='same'):
+   c.begin_page_recovery()
+   with patch.object(c,'windows',return_value=[dict(rows[0],workspace='3')]),patch.object(c,'aero') as aero:
+    self.assertFalse(c.reconcile_page_recovery())
+    aero.assert_any_call('move-node-to-workspace','--window-id','1','1')
+    self.assertTrue((c.STATE/'pages.recovery.json').exists())
+   with patch.object(c,'windows',return_value=[rows[0],rows[1]]),patch.object(c,'aero'):
+    self.assertTrue(c.reconcile_page_recovery())
+   self.assertFalse((c.STATE/'pages.recovery.json').exists())
+ def test_closed_window_drops_from_mutable_map_and_reused_id_is_not_restored(self):
+  old={'window-id':1,'app-pid':100,'workspace':'2','app-name':'Ghostty','window-layout':'h_tiles'}
+  (c.STATE/'pages.json').write_text(json.dumps({'boot':'same','page':'2','windows':[old]}))
+  with patch.object(c,'boot_session',return_value='same'):
+   c.begin_page_recovery()
+   reused=dict(old,**{'app-pid':200,'workspace':'3'})
+   with patch.object(c,'windows',return_value=[reused]),patch.object(c,'aero') as aero:
+    self.assertFalse(c.reconcile_page_recovery())
+    self.assertFalse(any(call.args[:1]==('move-node-to-workspace',) for call in aero.call_args_list))
+   with patch.object(c,'windows',return_value=[reused]),patch.object(c,'page',return_value='3'):
+    c.save_pages()
+  active=json.loads((c.STATE/'pages.json').read_text())
+  self.assertEqual(active['windows'],[reused])
+  self.assertTrue((c.STATE/'pages.recovery.json').exists())
  def test_active_recovery_restores_before_enabling_bindings(self):
   c.save_status('Active');events=[]
-  with patch.object(c,'ready'),patch.object(c,'restore_pages',side_effect=lambda:events.append('restore')),patch.object(c,'aero',side_effect=lambda *args,**kw:events.append(args)),patch.object(c,'save_pages'),patch.object(c,'load'),patch.object(c,'run'):
+  with patch.object(c,'ready'),patch.object(c,'reconcile_page_recovery',side_effect=lambda:events.append('restore')),patch.object(c,'aero',side_effect=lambda *args,**kw:events.append(args)),patch.object(c,'save_pages'),patch.object(c,'load'),patch.object(c,'run'):
    c.recover()
   self.assertEqual(events[:2],['restore',('mode','active')]);self.assertEqual(c.status(),'Active')
  def test_recovery_failure_releases_bindings(self):

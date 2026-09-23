@@ -66,8 +66,38 @@ def save_pages():
  data={'boot':boot_session(),'page':page(),'windows':current}
  temp=STATE/'pages.tmp';temp.write_text(json.dumps(data));temp.replace(path)
  return True
+def _recovery_pages_path(): return STATE/'pages.recovery.json'
+def begin_page_recovery():
+ # Keep the pre-transition map immutable while AeroSpace is repopulating its
+ # window inventory. The ordinary checkpoint remains free to track real closes.
+ source=STATE/'pages.json';backup=_recovery_pages_path()
+ if backup.exists() or not source.exists(): return
+ try:
+  data=json.loads(source.read_text())
+  if isinstance(data,dict) and isinstance(data.get('windows'),list) and data.get('boot')==boot_session():
+   temp=backup.with_suffix('.tmp');temp.write_text(json.dumps(data));temp.replace(backup)
+ except (ValueError,OSError): pass
+def reconcile_page_recovery():
+ # Restore late-arriving windows from the immutable transition map. Once every
+ # saved identity is visible again, the mutable pages.json is authoritative.
+ backup=_recovery_pages_path()
+ if not backup.exists(): return False
+ try:
+  data=json.loads(backup.read_text())
+  if not isinstance(data,dict) or not isinstance(data.get('windows'),list) or data.get('boot')!=boot_session():
+   return False
+  live={(w.get('window-id'),w.get('app-pid')) for w in windows()}
+  expected={(w.get('window-id'),w.get('app-pid')) for w in data['windows']
+            if isinstance(w,dict) and isinstance(w.get('window-id'),int) and not is_remote_viewer(w)}
+  restore_pages()
+  if expected.issubset(live):
+   backup.unlink(missing_ok=True)
+   return True
+ except (ValueError,OSError,RuntimeError): pass
+ return False
 def restore_pages():
- path=STATE/'pages.json'
+ recovery=_recovery_pages_path()
+ path=recovery if recovery.exists() else STATE/'pages.json'
  if not path.exists(): return
  try:
   data=json.loads(path.read_text())
@@ -541,7 +571,8 @@ def enter(count=0,add=False):
   # A disengaged AeroSpace server can still answer with Omac's config path.
   # Restore the saved page map whenever Omac is re-entering, not only when the
   # server was completely absent before startup.
-  if not active: restore_pages()
+  if not active:
+   begin_page_recovery();restore_pages()
   migrate_pages()
   workspace=origin or page()
   current=terminal_windows(workspace)
@@ -597,6 +628,7 @@ def enter(count=0,add=False):
   else:
    total=len(current)
   save_status('Active')
+  reconcile_page_recovery()
   save_pages()
   if not active: start_services()
   return f'{total} plain terminal windows tiled. No agents launched.'
@@ -630,9 +662,10 @@ def recover():
  # Startup hook executes under the same lock as all window mutations.
  previous=status()
  if previous not in ('Active','Paused'): return 'No recovery needed.'
+ begin_page_recovery()
  save_status('Recovering')
  try:
-  ready();restore_pages()
+  ready();reconcile_page_recovery()
   if previous=='Active':
    aero('mode','active');save_status('Active');save_pages()
    load('watcher');run('launchctl','kickstart',job('watcher'))
