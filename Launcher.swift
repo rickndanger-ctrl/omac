@@ -436,7 +436,7 @@ class Delegate: NSObject,NSApplicationDelegate {
  }
 
  let brandBar=OmacBrandBar()
- var barRefreshing=false
+ var barTimer:Timer?;var barRefreshing=false;var barRefreshPending=false
  private let shortcutQueue=DispatchQueue(label:"com.richard.omac.shortcut-routing")
  @objc func routeShortcuts(_ note:Notification? = nil) {
   let remote=NSWorkspace.shared.frontmostApplication?.bundleIdentifier=="com.apple.ScreenSharing"
@@ -448,7 +448,7 @@ class Delegate: NSObject,NSApplicationDelegate {
  }
  func statusTitle(_ text:String) { refreshBar();routeShortcuts() }
  func refreshBar() {
-  guard !barRefreshing else {return};barRefreshing=true
+  guard !barRefreshing else {barRefreshPending=true;return};barRefreshing=true
   DispatchQueue.global(qos:.utility).async {
    let result=process(aerospace ?? "/missing/aerospace",["list-workspaces","--focused"])
    let focused=process(aerospace ?? "/missing/aerospace",["list-windows","--focused","--format","%{app-pid}"])
@@ -465,6 +465,7 @@ class Delegate: NSObject,NSApplicationDelegate {
     self.item.button?.image=self.brandBar.image(page:page,status:status)
     self.item.button?.toolTip="Omac · \(status) · Page \(page) · Command 1–5 to switch"
     self.item.button?.setAccessibilityLabel("Omac, \(status), page \(page) of 5")
+    if self.barRefreshPending {self.barRefreshPending=false;self.refreshBar()}
    }
   }
  }
@@ -531,6 +532,9 @@ class Delegate: NSObject,NSApplicationDelegate {
   menuModel=menu
   item.button?.target=self;item.button?.action=#selector(showThemedMenu(_:))
   refreshShelf();shelfPage=currentShelfPage()
+  // Workspace-change notifications update pages immediately. This slower
+  // fallback also recovers status, shelf and AX focus after missed events.
+  barTimer=Timer.scheduledTimer(withTimeInterval:10,repeats:true){[weak self] _ in self?.refreshBar()}
   let main=NSMenu();let appItem=NSMenuItem();main.addItem(appItem);appItem.submenu=menu.copy() as? NSMenu;NSApp.mainMenu=main
   DistributedNotificationCenter.default().addObserver(self,selector:#selector(engageNotification(_:)),name:NSNotification.Name("com.richard.acc.engage"),object:nil,suspensionBehavior:.deliverImmediately)
   if FileManager.default.fileExists(atPath:state.appendingPathComponent("engage.request").path) {engageNotification(Notification(name:Notification.Name("com.richard.acc.engage")));return}
