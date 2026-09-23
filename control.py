@@ -331,7 +331,7 @@ def _park_remote_viewer(window):
  # Moving a hidden Screen Sharing window can make AeroSpace assign it the
  # destination's default tiled layout. Keep the isolated viewer floating so
  # it cannot become a tile if the remote workspace is shown or reused.
- aero('layout','--window-id',wid,'floating',check=False)
+ aero('layout','--window-id',wid,'floating')
 
 def evacuate_remote_viewers(workspace):
  """Keep Screen Sharing out of Omac's five page tile trees.
