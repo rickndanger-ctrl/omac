@@ -27,8 +27,22 @@ app_existed=0; state_existed=0; saver_existed=0; mutation_started=0
 [[ ! -e "$target_app" ]] || { ditto "$target_app" "$backup/Omac.app"; app_existed=1; }
 [[ ! -e "$state" ]] || { ditto "$state" "$backup/state"; state_existed=1; }
 [[ ! -e "$saver_dir/OMAC.saver" ]] || { ditto "$saver_dir/OMAC.saver" "$backup/OMAC.saver"; saver_existed=1; }
+wait_for_active() {
+ local attempt stable=0
+ for (( attempt=0; attempt<48; attempt++ )); do
+  if [[ -r "$state/status" ]] && [[ "$(cat "$state/status")" == Active ]] &&
+     launchctl print "gui/$(id -u)/com.richard.acc.aerospace" >/dev/null 2>&1; then
+   (( stable += 1 ))
+   (( stable >= 4 )) && return 0
+  else
+   stable=0
+  fi
+  sleep 0.25
+ done
+ return 1
+}
 rollback() {
- local result=$?
+ local result=$? check_json python_cmd
  if (( result != 0 && mutation_started )); then
   # Keep the failed installation for diagnosis; restore the original paths.
   if [[ "${OMAC_REENGAGE_AFTER_INSTALL:-0}" == 1 ]]; then
@@ -42,6 +56,21 @@ rollback() {
   (( ! state_existed )) || ditto "$backup/state" "$state"
   (( ! saver_existed )) || ditto "$backup/OMAC.saver" "$saver_dir/OMAC.saver"
   print -u2 "Installation failed; original files restored. Diagnostic backup: $backup"
+  if [[ "${OMAC_REENGAGE_AFTER_INSTALL:-0}" == 1 ]] && (( app_existed )) &&
+     [[ -x "$target_app/Contents/MacOS/AgentControlCenter" ]]; then
+   if OMAC_STATE_ROOT="$state" "$target_app/Contents/MacOS/AgentControlCenter" --prepare-runtime >/dev/null 2>&1 &&
+      check_json="$(OMAC_STATE_ROOT="$state" "$target_app/Contents/MacOS/AgentControlCenter" --check 2>/dev/null)" &&
+      python_cmd="$(print -r -- "$check_json" | /usr/bin/python3 -c 'import json,sys; print(json.load(sys.stdin)["python"])')" &&
+      OMAC_STATE_ROOT="$state" "$python_cmd" "$target_app/Contents/Resources/Payload/control.py" enter >/dev/null 2>&1 &&
+      wait_for_active; then
+    if [[ -e "$state/menu.enabled" ]] && ! launchctl print "gui/$(id -u)/com.richard.acc.menu" >/dev/null 2>&1; then
+     launchctl bootstrap "gui/$(id -u)" "$state/runtime/launchd/menu.plist" || true
+    fi
+    print -u2 'Previous Omac installation returned to Active.'
+   else
+    print -u2 'Previous Omac installation was restored but could not re-engage automatically; use Enter Omac before switching pages.'
+   fi
+  fi
  fi
 }
 trap rollback EXIT
@@ -59,8 +88,9 @@ if [[ "${OMAC_REENGAGE_AFTER_INSTALL:-0}" == 1 ]]; then
  check_json="$(OMAC_STATE_ROOT="$state" "$target_app/Contents/MacOS/AgentControlCenter" --check)"
  python_cmd="$(print -r -- "$check_json" | /usr/bin/python3 -c 'import json,sys; print(json.load(sys.stdin)["python"])')"
  OMAC_STATE_ROOT="$state" "$python_cmd" "$target_app/Contents/Resources/Payload/control.py" enter
- [[ "$(cat "$state/status")" == Active ]] || { print -u2 'Omac did not return to Active after installation.'; exit 1; }
- launchctl print "gui/$(id -u)/com.richard.acc.aerospace" >/dev/null 2>&1 || { print -u2 'Omac window manager did not start after installation.'; exit 1; }
+ # AeroSpace's startup callback can briefly set status to Recovering after
+ # enter returns. Give that callback time to finish before judging the upgrade.
+ wait_for_active || { print -u2 'Omac did not return to Active after installation.'; exit 1; }
 fi
 print "Omac installed. Backup: $backup"
 if [[ "${OMAC_REENGAGE_AFTER_INSTALL:-0}" != 1 ]]; then
