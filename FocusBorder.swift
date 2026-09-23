@@ -132,19 +132,28 @@ final class FocusBorderController {
               let app = NSRunningApplication(processIdentifier: pid),
               pid != ProcessInfo.processInfo.processIdentifier,
               !Self.excludedBundleIdentifiers.contains(app.bundleIdentifier ?? "") else {
-            panel.orderOut(nil); return
+            stopObserving()
+            panel.orderOut(nil)
+            return
         }
-        if observedPID == pid, observedWindow != nil { observeFocusedWindow(); return }
+        if observedPID == pid, observedWindow != nil {
+            observeFocusedWindow(in: AXUIElementCreateApplication(pid))
+            return
+        }
         stopObserving()
         observedPID = pid
         let application = AXUIElementCreateApplication(pid)
         var observer: AXObserver?
-        guard AXObserverCreate(pid, focusBorderAXCallback, &observer) == .success,
-              let observer else { panel.orderOut(nil); return }
-        appObserver = observer
-        AXObserverAddNotification(observer, application, kAXFocusedWindowChangedNotification as CFString,
-                                  Unmanaged.passUnretained(self).toOpaque())
-        CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .commonModes)
+        if AXObserverCreate(pid, focusBorderAXCallback, &observer) == .success,
+           let observer {
+            appObserver = observer
+            AXObserverAddNotification(observer, application, kAXFocusedWindowChangedNotification as CFString,
+                                      Unmanaged.passUnretained(self).toOpaque())
+            CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .commonModes)
+        }
+        // A hidden app may reject observation while its window remains in
+        // AeroSpace's tile tree. Read that AX window directly; the menu's
+        // existing refresh will retry if observation is unavailable.
         observeFocusedWindow(in: application)
     }
 
@@ -156,16 +165,23 @@ final class FocusBorderController {
         }
         let appElement: AXUIElement
         if let application { appElement = application }
-        else if let app = NSWorkspace.shared.frontmostApplication {
-            appElement = AXUIElementCreateApplication(app.processIdentifier)
-        } else { panel.orderOut(nil); return }
+        else if let observedPID { appElement = AXUIElementCreateApplication(observedPID) }
+        else { observedWindow = nil; panel.orderOut(nil); return }
 
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &value) == .success,
               let value, CFGetTypeID(value) == AXUIElementGetTypeID() else {
+            observedWindow = nil
             panel.orderOut(nil); return
         }
         let window = unsafeBitCast(value, to: AXUIElement.self)
+        var subrole: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(window, kAXSubroleAttribute as CFString, &subrole) == .success,
+              subrole as? String == kAXStandardWindowSubrole else {
+            observedWindow = nil
+            panel.orderOut(nil)
+            return
+        }
         observedWindow = window
 
         if let pid = observedPID {
