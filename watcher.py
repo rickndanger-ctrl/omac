@@ -26,7 +26,7 @@ def main():
       pending=time.monotonic()+0.3;continue
      try:
       if c.status()=='Active':
-       c.reconcile_page_recovery()
+       c.reconcile_page_recovery(late_only=True)
        c.save_pages()
      except (RuntimeError,ValueError,OSError): pass
  finally:

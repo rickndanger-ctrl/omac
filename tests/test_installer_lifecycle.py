@@ -29,7 +29,7 @@ class InstallerLifecycleTests(unittest.TestCase):
 case "$1" in
  config) echo "$AERO_CONFIG" ;;
  list-workspaces) [ "$AERO_RESPONSIVE" = yes ] && echo 1 ;;
- list-windows) [ "$AERO_RESPONSIVE" = yes ] || exit 1; [ "$AERO_HAS_WINDOWS" = yes ] && echo '[1]' || echo '[]' ;;
+ list-windows) [ "$AERO_RESPONSIVE" = yes ] || exit 1; echo "$AERO_LIVE_WINDOWS" ;;
 esac
 """)
             stub.chmod(0o755)
@@ -45,7 +45,8 @@ if [ "$JOB_RUNNING" = yes ]; then echo 'state = running'; else echo 'state = wai
             env = dict(os.environ, PATH=f"{root}:{os.environ['PATH']}",
                        GATE_STATE=str(state), AERO_CONFIG=expected,
                        AERO_RESPONSIVE="yes", AERO_HAS_WINDOWS="yes",
-                       JOB_RUNNING="yes")
+                       JOB_RUNNING="yes",
+                       AERO_LIVE_WINDOWS='[{"window-id":7,"app-pid":70},{"window-id":8,"app-pid":80}]')
             if scenario == "registered-stopped":
                 env["JOB_RUNNING"] = "no"
             elif scenario == "wrong-config":
@@ -53,12 +54,21 @@ if [ "$JOB_RUNNING" = yes ]; then echo 'state = running'; else echo 'state = wai
             elif scenario == "delayed-recovery":
                 # The first iterations see Recovering, then enter completes.
                 (state / "status").write_text("Recovering")
+            elif scenario == "recovers-then-recovers-again":
+                (state / "status").write_text("Active")
             elif scenario == "window-loss":
-                env["AERO_HAS_WINDOWS"] = "no"
+                env["AERO_LIVE_WINDOWS"] = "[]"
+            elif scenario == "partial-window-loss":
+                expected_pages = root / "expected-pages.json"
+                expected_pages.write_text('{"windows":[{"window-id":7,"app-pid":70,"app-name":"Ghostty"},{"window-id":8,"app-pid":80,"app-name":"ChatGPT"}]}')
+                env["AERO_LIVE_WINDOWS"] = '[{"window-id":8,"app-pid":80,"app-name":"ChatGPT"}]'
+                env["PAGES_BASELINE"] = str(expected_pages)
             sleep_stub = 'sleep() { :; }\n'
             if scenario == "delayed-recovery":
                 sleep_stub = 'sleep() { echo Active > "$GATE_STATE/status"; }\n'
-            script = 'state="$GATE_STATE"\n' + sleep_stub + self.function + '\nwait_for_active "$AERO_BIN" "$AERO_CONFIG_EXPECTED"; exit $?\n'
+            if scenario == "recovers-then-recovers-again":
+                sleep_stub = 'sleep() { echo Recovering > "$GATE_STATE/status"; }\n'
+            script = 'state="$GATE_STATE"\n' + sleep_stub + self.function + '\nwait_for_active "$AERO_BIN" "$AERO_CONFIG_EXPECTED" "${PAGES_BASELINE:-}"; exit $?\n'
             env["AERO_BIN"] = str(stub)
             env["AERO_CONFIG_EXPECTED"] = expected
             env["OMAC_STATE_ROOT"] = str(root)
@@ -77,6 +87,12 @@ if [ "$JOB_RUNNING" = yes ]; then echo 'state = running'; else echo 'state = wai
 
     def test_missing_windows_is_an_explicit_degraded_result(self):
         self.assertEqual(self.run_gate("window-loss"), 2)
+
+    def test_current_recovering_status_cannot_pass_after_active_sample(self):
+        self.assertEqual(self.run_gate("recovers-then-recovers-again"), 1)
+
+    def test_missing_ghostty_with_chatgpt_still_present_is_degraded(self):
+        self.assertEqual(self.run_gate("partial-window-loss"), 2)
 
     def test_reengage_success_and_rollback_use_isolated_stubs(self):
         for fail_new_enter in (False, True):

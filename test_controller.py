@@ -93,10 +93,23 @@ class Lifecycle(unittest.TestCase):
    self.assertTrue((c.STATE/'windows.json').exists())
    self.assertEqual(aero.call_args_list[-1].args,('enable','off'))
  def test_exit_only_stops_manager(self):
-  with patch.object(c,'aero'),patch.object(c,'run') as run:
+  import subprocess
+  with patch.object(c,'aero'),patch.object(c,'run') as run,patch.object(c.subprocess,'run',side_effect=[subprocess.CompletedProcess([],0),subprocess.CompletedProcess([],1)]):
    c.stop(True)
-   run.assert_any_call('launchctl','bootout',c.job('aerospace'),check=False)
-   run.assert_any_call(c.APP,'--restore',check=False)
+   run.assert_any_call('launchctl','bootout',c.job('aerospace'))
+   run.assert_any_call(c.APP,'--restore')
+   self.assertEqual(c.status(),'Inactive')
+ def test_failed_native_restore_retains_exit_evidence(self):
+  import subprocess
+  (c.STATE/'aerospace.enabled').touch()
+  (c.STATE/'windows.json').write_text('[{"pid": 1}]')
+  def command(*args,**kwargs):
+   if args[:2]==(c.APP,'--restore'): raise RuntimeError('AX window not restored')
+  with patch.object(c,'aero'),patch.object(c,'run',side_effect=command),patch.object(c.subprocess,'run',side_effect=[subprocess.CompletedProcess([],0),subprocess.CompletedProcess([],1)]):
+   with self.assertRaisesRegex(RuntimeError,'AX window not restored'):c.stop(True)
+  self.assertEqual(c.status(),'RecoveryNeeded')
+  self.assertTrue((c.STATE/'aerospace.enabled').exists())
+  self.assertTrue((c.STATE/'windows.json').exists())
  def test_permission_failure_does_not_enable_manager(self):
   with patch.object(c,'aero',return_value=''),patch.object(c,'run',side_effect=RuntimeError('permission')):
    with self.assertRaises(RuntimeError):c.enter()

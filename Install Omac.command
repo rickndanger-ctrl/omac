@@ -28,25 +28,44 @@ app_existed=0; state_existed=0; saver_existed=0; mutation_started=0
 [[ ! -e "$state" ]] || { ditto "$state" "$backup/state"; state_existed=1; }
 [[ ! -e "$saver_dir/OMAC.saver" ]] || { ditto "$saver_dir/OMAC.saver" "$backup/OMAC.saver"; saver_existed=1; }
 wait_for_active() {
- local aerospace="$1" expected_config="$2" attempt stable=0 active_seen=0 ready_without_windows=0 windows_json
+ local aerospace="$1" expected_config="$2" expected_pages="${3:-}" attempt stable=0 degraded=0 windows_json missing
  for (( attempt=0; attempt<48; attempt++ )); do
-  if [[ -r "$state/status" ]] && [[ "$(cat "$state/status")" == Active ]]; then
-   active_seen=1
-  fi
   local job_info config_path
   job_info="$(launchctl print "gui/$(id -u)/com.richard.acc.aerospace" 2>/dev/null || true)"
   config_path="$("$aerospace" config --config-path 2>/dev/null || true)"
   # A returned config path and focused-workspace query prove the server answers,
   # and that launchd started the job with Omac's generated configuration.
-  if [[ "$active_seen" == 1 ]] && [[ "$job_info" == *'state = running'* ]] &&
+  if [[ -r "$state/status" ]] && [[ "$(cat "$state/status")" == Active ]] &&
+     [[ "$job_info" == *'state = running'* ]] &&
      [[ "$config_path" == "$expected_config" ]] &&
      "$aerospace" list-workspaces --focused >/dev/null 2>&1; then
-   if windows_json="$("$aerospace" list-windows --all --format '%{window-id}' --json 2>/dev/null)"; then
+   if windows_json="$("$aerospace" list-windows --all --format '%{window-id} %{app-pid}' --json 2>/dev/null)"; then
     if [[ -n "$windows_json" && "$windows_json" != '[]' ]]; then
+     missing=0
+     if [[ -n "$expected_pages" && -r "$expected_pages" ]]; then
+      missing="$(/usr/bin/python3 - "$expected_pages" "$windows_json" <<'PY'
+import json, sys
+try:
+    saved = json.load(open(sys.argv[1], encoding="utf-8"))
+    current = json.loads(sys.argv[2])
+    expected = {(str(w["window-id"]), str(w["app-pid"])) for w in saved.get("windows", [])
+                if w.get("window-id") is not None and w.get("app-pid") is not None}
+    live = {(str(w.get("window-id")), str(w.get("app-pid"))) for w in current}
+    print(len(expected - live))
+except Exception:
+    print("invalid")
+PY
+)"
+     fi
+     if [[ "$missing" == 0 ]]; then
      (( stable += 1 ))
      (( stable >= 4 )) && return 0
+     else
+      degraded=1
+      stable=0
+     fi
     else
-     ready_without_windows=1
+     degraded=1
      stable=0
     fi
    else
@@ -57,11 +76,11 @@ wait_for_active() {
   fi
   sleep 0.25
  done
- # A running, responsive, correctly configured server with no windows is an
- # expected-window loss. Report it as degraded without replacing known files.
+ # A running, responsive, correctly configured server with no windows or with
+ # missing saved window identities is degraded; retain files for recovery.
  # The install remains available for manual recovery instead of triggering a
  # rollback/re-engage cycle that can repeatedly disturb the user's session.
- (( ready_without_windows )) && return 2
+ (( degraded )) && return 2
  return 1
 }
 rollback() {
@@ -86,7 +105,7 @@ rollback() {
       python_cmd="$(print -r -- "$check_json" | /usr/bin/python3 -c 'import json,sys; print(json.load(sys.stdin)["python"])')" &&
       aerospace_cli="$(print -r -- "$check_json" | /usr/bin/python3 -c 'import json,sys; print(json.load(sys.stdin)["aerospace"])')" &&
       OMAC_STATE_ROOT="$state" "$python_cmd" "$target_app/Contents/Resources/Payload/control.py" enter >/dev/null 2>&1 &&
-      wait_for_active "$aerospace_cli" "$state/runtime/config/aerospace.toml"; then
+      wait_for_active "$aerospace_cli" "$state/runtime/config/aerospace.toml" "$backup/state/pages.json"; then
     if [[ -e "$state/menu.enabled" ]] && ! launchctl print "gui/$(id -u)/com.richard.acc.menu" >/dev/null 2>&1; then
      launchctl bootstrap "gui/$(id -u)" "$state/runtime/launchd/menu.plist" || true
     fi
@@ -115,13 +134,13 @@ if [[ "${OMAC_REENGAGE_AFTER_INSTALL:-0}" == 1 ]]; then
  aerospace_cli="$(print -r -- "$check_json" | /usr/bin/python3 -c 'import json,sys; print(json.load(sys.stdin)["aerospace"])')"
  # AeroSpace's startup callback can briefly set status to Recovering after
  # enter returns. Give it time to become Active and answer with Omac's config.
- if wait_for_active "$aerospace_cli" "$state/runtime/config/aerospace.toml"; then
+ if wait_for_active "$aerospace_cli" "$state/runtime/config/aerospace.toml" "$backup/state/pages.json"; then
   :
  else
   gate_result=$?
   if (( gate_result == 2 )); then
    mutation_started=0
-   print -u2 'Omac installed in a degraded state: AeroSpace is responsive with Omac config, but no windows are available. Use Enter Omac to recover the expected window state.'
+   print -u2 'Omac installed in a degraded state: AeroSpace is responsive with Omac config, but saved windows are missing. Use Enter Omac to recover the expected window state.'
   else
    print -u2 'Omac did not return to Active after installation.'
    exit 1

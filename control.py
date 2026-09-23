@@ -77,7 +77,7 @@ def begin_page_recovery():
   if isinstance(data,dict) and isinstance(data.get('windows'),list) and data.get('boot')==boot_session():
    temp=backup.with_suffix('.tmp');temp.write_text(json.dumps(data));temp.replace(backup)
  except (ValueError,OSError): pass
-def reconcile_page_recovery():
+def reconcile_page_recovery(restore_current_page=False,late_only=False):
  # Restore late-arriving windows from the immutable transition map. Once every
  # saved identity is visible again, the mutable pages.json is authoritative.
  backup=_recovery_pages_path()
@@ -89,13 +89,23 @@ def reconcile_page_recovery():
   live={(w.get('window-id'),w.get('app-pid')) for w in windows()}
   expected={(w.get('window-id'),w.get('app-pid')) for w in data['windows']
             if isinstance(w,dict) and isinstance(w.get('window-id'),int) and not is_remote_viewer(w)}
-  restore_pages()
+  candidates=None
+  if late_only:
+   # A pending recovery must not undo the user's later edits to windows that
+   # were already visible. Only restore identities new to the last live map.
+   try:
+    previous=json.loads((STATE/'pages.json').read_text())
+    known={(w.get('window-id'),w.get('app-pid')) for w in previous.get('windows',[])}
+   except (ValueError,OSError,AttributeError,TypeError): known=set()
+   candidates={wid for wid,pid in expected & live if (wid,pid) not in known}
+  if candidates is None or candidates:
+   restore_pages(restore_current_page=restore_current_page,only_window_ids=candidates)
   if expected.issubset(live):
    backup.unlink(missing_ok=True)
    return True
  except (ValueError,OSError,RuntimeError): pass
  return False
-def restore_pages():
+def restore_pages(restore_current_page=True,only_window_ids=None):
  recovery=_recovery_pages_path()
  path=recovery if recovery.exists() else STATE/'pages.json'
  if not path.exists(): return
@@ -108,6 +118,7 @@ def restore_pages():
  warnings=[]
  for w in data['windows']:
   if not isinstance(w,dict) or not isinstance(w.get('window-id'),int): continue
+  if only_window_ids is not None and w['window-id'] not in only_window_ids: continue
   if is_remote_viewer(w): continue
   current=live.get(w['window-id'])
   if not current or current.get('app-pid')!=w.get('app-pid'): continue
@@ -129,8 +140,9 @@ def restore_pages():
    try: aero('layout','--window-id',str(w['window-id']),desired)
    except RuntimeError as exc: warnings.append(f"Window {w['window-id']} layout was left as-is: {exc}")
  if warnings: (STATE/'recovery-warnings.log').write_text('\n'.join(warnings)+'\n')
- target=data.get('page','1')
- aero('workspace',target if target in ('1','2','3','4','5') else '1')
+ if restore_current_page:
+  target=data.get('page','1')
+  aero('workspace',target if target in ('1','2','3','4','5') else '1')
 def migrate_pages():
  for w in windows():
   if w.get('workspace')=='Terminals':
@@ -453,12 +465,24 @@ def stop(restore=False):
  except (RuntimeError,ValueError): pass
  aero('mode','main',check=False)
  aero('enable','off',check=False)
- save_status('Paused' if not restore else 'Inactive')
- if restore:
-  (STATE/'aerospace.enabled').unlink(missing_ok=True)
-  run('launchctl','bootout',job('aerospace'),check=False)
-  run(APP,'--restore',check=False)
+ if not restore:
+  save_status('Paused')
+  return 'Windows and agent sessions remain open.'
+ try:
+  # A registered but stopped manager is still an incomplete exit. Do not
+  # discard the enabled marker or claim Inactive until native restoration
+  # confirms every saved window, leaving its unresolved snapshot for retry.
+  registered=subprocess.run(['launchctl','print',job('aerospace')],capture_output=True).returncode==0
+  if registered: run('launchctl','bootout',job('aerospace'))
+  if subprocess.run(['launchctl','print',job('aerospace')],capture_output=True).returncode==0:
+   raise RuntimeError('AeroSpace is still registered; Omac exit is incomplete.')
+  run(APP,'--restore')
   run(APP,'--restore-wallpaper',check=False)
+ except Exception:
+  save_status('RecoveryNeeded')
+  raise
+ (STATE/'aerospace.enabled').unlink(missing_ok=True)
+ save_status('Inactive')
  return 'Windows and agent sessions remain open.'
 
 def terminal_windows(workspace=None):
@@ -665,7 +689,7 @@ def recover():
  begin_page_recovery()
  save_status('Recovering')
  try:
-  ready();reconcile_page_recovery()
+  ready();reconcile_page_recovery(restore_current_page=True)
   if previous=='Active':
    aero('mode','active');save_status('Active');save_pages()
    load('watcher');run('launchctl','kickstart',job('watcher'))

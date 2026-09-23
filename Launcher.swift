@@ -176,6 +176,7 @@ func eachWindow(_ body: (NSRunningApplication,AXUIElement,Int)->Void) {
  }
 }
 let snapshot = state.appendingPathComponent("windows.json")
+let restoredBaseline = state.appendingPathComponent("windows.last-restored.json")
 if let index=CommandLine.arguments.firstIndex(of:"--center"), CommandLine.arguments.count>index+1, let pid=Int32(CommandLine.arguments[index+1]) {
  guard AXIsProcessTrusted() else { fputs("Accessibility access required.\n",stderr);exit(2) }
  let target=AXUIElementCreateApplication(pid)
@@ -203,20 +204,42 @@ if CommandLine.arguments.contains("--snapshot") {
    AXValueGetValue(pos as! AXValue,.cgPoint,&point); AXValueGetValue(size as! AXValue,.cgSize,&dimensions)
    saved.append(["pid":Int(app.processIdentifier),"index":index,"title":attribute(w,kAXTitleAttribute) as? String ?? "","x":point.x,"y":point.y,"w":dimensions.width,"h":dimensions.height])
   }
-  do {try JSONSerialization.data(withJSONObject:saved).write(to:snapshot,options:.atomic)} catch {exit(1)}
+  do {
+   let data=try JSONSerialization.data(withJSONObject:saved)
+   // The installer runs after disengagement; keep this pre-transition copy
+   // even when a complete native restore clears the retry snapshot.
+   try data.write(to:restoredBaseline,options:.atomic)
+   try data.write(to:snapshot,options:.atomic)
+  } catch {exit(1)}
  }
  exit(0)
 }
 if CommandLine.arguments.contains("--restore") {
- if AXIsProcessTrusted(), let data=try? Data(contentsOf:snapshot), let saved=(try? JSONSerialization.jsonObject(with:data)) as? [[String:Any]] {
+ guard AXIsProcessTrusted() else { fputs("Accessibility access required to restore saved windows.\n",stderr);exit(2) }
+ if FileManager.default.fileExists(atPath:snapshot.path) {
+  guard let data=try? Data(contentsOf:snapshot), let saved=(try? JSONSerialization.jsonObject(with:data)) as? [[String:Any]] else {
+   fputs("Could not read saved window positions; snapshot retained.\n",stderr);exit(1)
+  }
+  var unresolved=saved
   eachWindow { app,w,index in
    let title=attribute(w,kAXTitleAttribute) as? String ?? ""
-   guard let entry=saved.first(where:{($0["pid"] as? Int)==Int(app.processIdentifier) && ($0["index"] as? Int)==index && ($0["title"] as? String)==title}), let x=entry["x"] as? Double,let y=entry["y"] as? Double, let width=entry["w"] as? Double,let height=entry["h"] as? Double else {return}
+   guard let savedIndex=unresolved.firstIndex(where:{($0["pid"] as? Int)==Int(app.processIdentifier) && ($0["index"] as? Int)==index && ($0["title"] as? String)==title}) else {return}
+   let entry=unresolved[savedIndex]
+   guard let x=entry["x"] as? Double,let y=entry["y"] as? Double,let width=entry["w"] as? Double,let height=entry["h"] as? Double else {return}
    var pos=CGPoint(x:x,y:y); var size=CGSize(width:width,height:height)
-   if let value=AXValueCreate(.cgSize,&size) {AXUIElementSetAttributeValue(w,kAXSizeAttribute as CFString,value)}
-   if let value=AXValueCreate(.cgPoint,&pos) {AXUIElementSetAttributeValue(w,kAXPositionAttribute as CFString,value)}
+   guard let sizeValue=AXValueCreate(.cgSize,&size),let posValue=AXValueCreate(.cgPoint,&pos) else {return}
+   let sizeResult=AXUIElementSetAttributeValue(w,kAXSizeAttribute as CFString,sizeValue)
+   let positionResult=AXUIElementSetAttributeValue(w,kAXPositionAttribute as CFString,posValue)
+   if sizeResult == .success && positionResult == .success {unresolved.remove(at:savedIndex)}
   }
-  try? FileManager.default.removeItem(at:snapshot)
+  if unresolved.isEmpty {
+   do {try FileManager.default.removeItem(at:snapshot)} catch {fputs("Could not clear restored window snapshot.\n",stderr);exit(1)}
+  } else {
+   do {try JSONSerialization.data(withJSONObject:unresolved).write(to:snapshot,options:.atomic)} catch {
+    fputs("Could not save unresolved window positions.\n",stderr);exit(1)
+   }
+   fputs("Some window positions could not be restored; unresolved snapshot retained.\n",stderr);exit(3)
+  }
  }
  exit(0)
 }

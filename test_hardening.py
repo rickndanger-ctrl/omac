@@ -88,6 +88,7 @@ class Hardening(unittest.TestCase):
    with patch.object(c,'windows',return_value=[dict(rows[0],workspace='3')]),patch.object(c,'aero') as aero:
     self.assertFalse(c.reconcile_page_recovery())
     aero.assert_any_call('move-node-to-workspace','--window-id','1','1')
+    self.assertFalse(any(call.args[:1]==('workspace',) for call in aero.call_args_list))
     self.assertTrue((c.STATE/'pages.recovery.json').exists())
    with patch.object(c,'windows',return_value=[rows[0],rows[1]]),patch.object(c,'aero'):
     self.assertTrue(c.reconcile_page_recovery())
@@ -106,9 +107,20 @@ class Hardening(unittest.TestCase):
   active=json.loads((c.STATE/'pages.json').read_text())
   self.assertEqual(active['windows'],[reused])
   self.assertTrue((c.STATE/'pages.recovery.json').exists())
+ def test_late_recovery_does_not_retile_or_change_page_for_existing_windows(self):
+  first={'window-id':1,'app-pid':101,'workspace':'1','app-name':'Ghostty','window-layout':'h_tiles'}
+  late={'window-id':2,'app-pid':102,'workspace':'2','app-name':'Ghostty','window-layout':'h_tiles'}
+  (c.STATE/'pages.json').write_text(json.dumps({'boot':'same','page':'1','windows':[first,late]}))
+  with patch.object(c,'boot_session',return_value='same'):
+   c.begin_page_recovery()
+   (c.STATE/'pages.json').write_text(json.dumps({'boot':'same','page':'3','windows':[dict(first,workspace='3')]}))
+   live=[dict(first,workspace='3'),dict(late,workspace='3')]
+   with patch.object(c,'windows',return_value=live),patch.object(c,'aero') as aero:
+    self.assertTrue(c.reconcile_page_recovery(late_only=True))
+   self.assertEqual([call.args for call in aero.call_args_list],[('move-node-to-workspace','--window-id','2','2')])
  def test_active_recovery_restores_before_enabling_bindings(self):
   c.save_status('Active');events=[]
-  with patch.object(c,'ready'),patch.object(c,'reconcile_page_recovery',side_effect=lambda:events.append('restore')),patch.object(c,'aero',side_effect=lambda *args,**kw:events.append(args)),patch.object(c,'save_pages'),patch.object(c,'load'),patch.object(c,'run'):
+  with patch.object(c,'ready'),patch.object(c,'reconcile_page_recovery',side_effect=lambda **kw:events.append('restore')),patch.object(c,'aero',side_effect=lambda *args,**kw:events.append(args)),patch.object(c,'save_pages'),patch.object(c,'load'),patch.object(c,'run'):
    c.recover()
   self.assertEqual(events[:2],['restore',('mode','active')]);self.assertEqual(c.status(),'Active')
  def test_recovery_failure_releases_bindings(self):
