@@ -319,18 +319,6 @@ if !CommandLine.arguments.contains("--managed") {
 final class OmacBrandBar {
  private var wallpaperURL: URL?
  private(set) var accent = NSColor(calibratedRed:0.55,green:0.9,blue:0.35,alpha:1)
- private var silhouette = NSBezierPath()
- init(logo: String) {
-  if let image=NSImage(contentsOfFile:logo),let data=image.tiffRepresentation,let bitmap=NSBitmapImageRep(data:data) {
-   let left=Int(Double(bitmap.pixelsWide)*0.07), top=Int(Double(bitmap.pixelsHigh)*0.33)
-   let right=Int(Double(bitmap.pixelsWide)*0.93), bottom=Int(Double(bitmap.pixelsHigh)*0.60)
-   for y in stride(from:top,to:bottom,by:2) {for x in stride(from:left,to:right,by:2) {
-    if let c=bitmap.colorAt(x:x,y:y)?.usingColorSpace(.deviceRGB), c.greenComponent>0.48 && c.greenComponent>c.blueComponent*1.2 {
-     silhouette.appendRect(NSRect(x:Double(x-left)/Double(right-left)*47,y:Double(bottom-y)/Double(bottom-top)*13,width:0.20,height:0.20))
-    }
-   }}
-  }
- }
  func refreshPalette() {
   guard let screen=NSScreen.main ?? NSScreen.screens.first,var url=NSWorkspace.shared.desktopImageURL(for:screen) else {return}
   // macOS can report DefaultDesktop for a wallpaper owned by its newer wallpaper service.
@@ -359,7 +347,8 @@ final class OmacBrandBar {
   refreshPalette()
   let image=NSImage(size:NSSize(width:168,height:22));image.lockFocus()
   let active=status=="Active", color=active ? accent:NSColor.secondaryLabelColor
-  NSGraphicsContext.saveGraphicsState();let transform=NSAffineTransform();transform.translateX(by:0,yBy:4);transform.concat();color.setFill();silhouette.fill();NSGraphicsContext.restoreGraphicsState()
+  let brandAttributes:[NSAttributedString.Key:Any]=[.font:NSFont.systemFont(ofSize:12,weight:.bold),.foregroundColor:color]
+  ("OMAC" as NSString).draw(at:NSPoint(x:0,y:5),withAttributes:brandAttributes)
   for n in 1...5 {
    let r=NSRect(x:56+(n-1)*22,y:2,width:19,height:18)
    let p=NSBezierPath(roundedRect:r,xRadius:5,yRadius:5)
@@ -418,6 +407,9 @@ class Delegate: NSObject,NSApplicationDelegate {
  }
  @objc func shelfAction(_ note:Notification) {if note.userInfo?["action"] as? String == "favorite",let key=note.userInfo?["key"] as? String,let bundle=favorites.bundle(for:key),shelfActive() {launchShelfApp(bundle);return};if let action=note.userInfo?["action"] as? String,["shelf","shelf-add","shelf-tuck","place-left","place-right","menu"].contains(action) {perform(action)}}
  @objc func shelfPageChanged(_ note:Notification) {
+  // AeroSpace sends this only after the focused workspace has changed.
+  // Refresh the page indicator from that confirmed event.
+  refreshBar()
   guard shelfActive(),!shelfTransition else{return}
   let page=currentShelfPage()
   guard page != shelfPage else{return}
@@ -443,8 +435,8 @@ class Delegate: NSObject,NSApplicationDelegate {
   } catch {shelfError(error)}
  }
 
- let brandBar=OmacBrandBar(logo:root+"/branding/Omac.png")
- var barTimer:Timer?;var barRefreshing=false
+ let brandBar=OmacBrandBar()
+ var barRefreshing=false
  private let shortcutQueue=DispatchQueue(label:"com.richard.omac.shortcut-routing")
  @objc func routeShortcuts(_ note:Notification? = nil) {
   let remote=NSWorkspace.shared.frontmostApplication?.bundleIdentifier=="com.apple.ScreenSharing"
@@ -539,7 +531,6 @@ class Delegate: NSObject,NSApplicationDelegate {
   menuModel=menu
   item.button?.target=self;item.button?.action=#selector(showThemedMenu(_:))
   refreshShelf();shelfPage=currentShelfPage()
-  barTimer=Timer.scheduledTimer(withTimeInterval:1.5,repeats:true){[weak self] _ in self?.refreshBar()}
   let main=NSMenu();let appItem=NSMenuItem();main.addItem(appItem);appItem.submenu=menu.copy() as? NSMenu;NSApp.mainMenu=main
   DistributedNotificationCenter.default().addObserver(self,selector:#selector(engageNotification(_:)),name:NSNotification.Name("com.richard.acc.engage"),object:nil,suspensionBehavior:.deliverImmediately)
   if FileManager.default.fileExists(atPath:state.appendingPathComponent("engage.request").path) {engageNotification(Notification(name:Notification.Name("com.richard.acc.engage")));return}
