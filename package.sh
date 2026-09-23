@@ -16,7 +16,7 @@ out="$PWD/dist"
 stage="$out/staging"
 app="$stage/Omac.app"
 [[ ! -e "$app" ]] || { print -u2 'Existing staging app: move dist aside before rebuilding.'; exit 1; }
-mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources/Payload/config" "$app/Contents/Resources/Payload/branding/wallpapers" "$app/Contents/Resources/Extras"
+mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources/Payload/config" "$app/Contents/Resources/Payload/branding/wallpapers"
 cat Launcher.swift WindowCycle.swift FocusBorder.swift AppShelf.swift ShelfPanel.swift AppFavorites.swift > "$stage/main.swift"
 swiftc -O -target "$arch-apple-macosx14.0" "$stage/main.swift" -o "$app/Contents/MacOS/AgentControlCenter" -framework Cocoa -framework ApplicationServices -framework WebKit -framework ServiceManagement
 rm "$stage/main.swift"
@@ -29,14 +29,10 @@ cp branding/Omac.png "$app/Contents/Resources/Payload/branding/"
 cp branding/Omac.icns "$app/Contents/Resources/"
 cp tile_modes.py control.py watcher.py portable_paths.py generate_config.py mac_switch.py Guide.html "$app/Contents/Resources/Payload/"
 cp config/ghostty.conf "$app/Contents/Resources/Payload/config/"
-cp branding/wallpapers/omac-{obsidian,amber,pine,emerald-glass,storm-forge,crimson-etch}.png "$app/Contents/Resources/Payload/branding/wallpapers/"
+cp branding/wallpapers/omac-{amber-forge,silver-ice,jungle,sky,ghost,grim-reaper}.png "$app/Contents/Resources/Payload/branding/wallpapers/"
 cp LICENSE "$app/Contents/Resources/LICENSE"
-branding/screensaver/build.sh
-cp -R branding/screensaver/build/OMAC.saver branding/screensaver/build/OMAC-Preview.app "$app/Contents/Resources/Extras/"
-for bundle in "$app/Contents/Resources/Extras/OMAC.saver" "$app/Contents/Resources/Extras/OMAC-Preview.app" "$app"; do
- codesign --force --options runtime --sign "$identity" "$bundle"
- codesign --verify --deep --strict "$bundle"
-done
+codesign --force --options runtime --sign "$identity" "$app"
+codesign --verify --deep --strict "$app"
 cp DISTRIBUTION.md "$stage/START HERE.md"
 cp LICENSE "$stage/LICENSE"
 cp "Install Omac.command" "$stage/Install Omac.command"

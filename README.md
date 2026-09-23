@@ -1,10 +1,10 @@
 # Omac
 
-Omac is a free, community-built keyboard-first macOS workspace built around AeroSpace, Ghostty, native apps, persistent pages, an app shelf, focus highlighting, and optional animated wallpaper. This repository currently builds a portable engineering preview. The signed bundle has been installed and exercised on two development Macs; it is not notarized or production-certified. **Read [DISTRIBUTION.md](DISTRIBUTION.md) before sharing or installing a build.**
+Omac is a free, community-built keyboard-first macOS workspace built around AeroSpace, Ghostty, native apps, persistent pages, an app shelf, focus highlighting, and six static wallpapers. This repository currently builds a portable engineering preview. The signed bundle has been installed and exercised on two development Macs; it is not notarized or production-certified. **Read [DISTRIBUTION.md](DISTRIBUTION.md) before sharing or installing a build.**
 
 ## Build
 
-Run `./package.sh`. It compiles an app, includes its resources and optional saver, runs tests, signs the bundles and creates a checksummed DMG. It neither installs nor notarizes. Move an existing `dist` aside before rebuilding. The script reuses the first available Apple Development identity unless `OMAC_SIGN_IDENTITY` is set explicitly; it falls back to an ad-hoc engineering build only when no development identity is available.
+Run `./package.sh`. It compiles an app, includes its resources, runs tests, signs the bundle and creates a checksummed DMG. It neither installs nor notarizes. Move an existing `dist` aside before rebuilding. The script reuses the first available Apple Development identity unless `OMAC_SIGN_IDENTITY` is set explicitly; it falls back to an ad-hoc engineering build only when no development identity is available.
 
 The app uses its own bundled resources, generates configs in each user's Application Support folder, discovers standard Homebrew/Python installations and diagnoses missing dependencies. It does not run from the development checkout after installation. The menu's Start at Login controls use native SMAppService registration; installed-app login registration has passed on the second development Mac, while reboot and sign-out/sign-in acceptance remain open. launchd continues supervising the window manager and watcher.
 
@@ -20,9 +20,9 @@ Dependencies remain external: AeroSpace app/CLI, Ghostty and Python. The public-
 - Control–Option–Shift–2 / 3 applies an explicit app-plus-terminals mixed layout; Control–Option–M expands or returns its focused member, and Control–Option–Shift–R restores the original layout.
 - Command–K opens the guide. Control–Option–P pauses. Control–Option–Escape disengages and leaves agents running.
 - Optional Screen Sharing handoff: Control–Option–1 returns to the remembered local window and Control–Option–2 enters the configured remote Mac. These shortcuts are absent unless remote control is configured.
-- Screensaver preview: 1 assembly, 2 red laser, 3 lightning, 4 logo; Escape closes.
+- Omac Appearance offers Amber Forge, Silver Ice, Jungle, Sky, Ghost, and Grim Reaper as static wallpapers.
 
-Existing apps retain their minimum sizes. The five pages are AeroSpace workspaces, not additional native Mission Control Spaces. A reboot cannot preserve running shell processes. Renderer previews are verified; native idle saver activation remains unverified.
+Existing apps retain their minimum sizes. The five pages are AeroSpace workspaces, not additional native Mission Control Spaces. A reboot cannot preserve running shell processes.
 
 Mixed layout is never applied during app launch. Restore it before swap, resize, balance, float/tile, or fullscreen commands; those shape-changing commands refuse while the protected mixed layout is active. Restore validates the boot, process, exact window ID, and page before mutation.
 

@@ -22,7 +22,6 @@ fi
 # Check the downloaded copy before moving any existing installation or user data.
 codesign --verify --deep --strict "$source_app"
 "$source_app/Contents/MacOS/AgentControlCenter" --check
-[[ -d "$source_app/Contents/Resources/Extras/OMAC.saver" ]] || { print -u2 'Screensaver missing from package.'; exit 1; }
 mkdir -p "${target_app:h}" "$backup" "$saver_dir"
 app_existed=0; state_existed=0; saver_existed=0; mutation_started=0
 [[ ! -e "$target_app" ]] || { ditto "$target_app" "$backup/Omac.app"; app_existed=1; }
@@ -32,6 +31,10 @@ rollback() {
  local result=$?
  if (( result != 0 && mutation_started )); then
   # Keep the failed installation for diagnosis; restore the original paths.
+  if [[ "${OMAC_REENGAGE_AFTER_INSTALL:-0}" == 1 ]]; then
+   launchctl bootout "gui/$(id -u)/com.richard.acc.watcher" >/dev/null 2>&1 || true
+   launchctl bootout "gui/$(id -u)/com.richard.acc.aerospace" >/dev/null 2>&1 || true
+  fi
   [[ ! -e "$target_app" ]] || mv "$target_app" "$backup/failed-Omac.app"
   [[ ! -e "$state" ]] || mv "$state" "$backup/failed-state"
   [[ ! -e "$saver_dir/OMAC.saver" ]] || mv "$saver_dir/OMAC.saver" "$backup/failed-OMAC.saver"
@@ -46,12 +49,23 @@ mutation_started=1
 [[ ! -e "$target_app" ]] || mv "$target_app" "$backup/replaced-Omac.app"
 ditto "$source_app" "$target_app"
 [[ ! -e "$saver_dir/OMAC.saver" ]] || mv "$saver_dir/OMAC.saver" "$backup/replaced-OMAC.saver"
-ditto "$target_app/Contents/Resources/Extras/OMAC.saver" "$saver_dir/OMAC.saver"
+# Retire the old Omac screensaver on upgrade. The static wallpaper collection
+# does not install or select a replacement; the backup remains reversible.
 mkdir -p "$state"
-[[ -e "$state/wallpaper.selected" ]] || print -n 'storm-forge' > "$state/wallpaper.selected"
+[[ -e "$state/wallpaper.selected" ]] || print -n 'silver-ice' > "$state/wallpaper.selected"
 OMAC_STATE_ROOT="$state" "$target_app/Contents/MacOS/AgentControlCenter" --prepare-runtime
 codesign --verify --deep --strict "$target_app"
+if [[ "${OMAC_REENGAGE_AFTER_INSTALL:-0}" == 1 ]]; then
+ check_json="$(OMAC_STATE_ROOT="$state" "$target_app/Contents/MacOS/AgentControlCenter" --check)"
+ python_cmd="$(print -r -- "$check_json" | /usr/bin/python3 -c 'import json,sys; print(json.load(sys.stdin)["python"])')"
+ OMAC_STATE_ROOT="$state" "$python_cmd" "$target_app/Contents/Resources/Payload/control.py" enter
+ [[ "$(cat "$state/status")" == Active ]] || { print -u2 'Omac did not return to Active after installation.'; exit 1; }
+ launchctl print "gui/$(id -u)/com.richard.acc.aerospace" >/dev/null 2>&1 || { print -u2 'Omac window manager did not start after installation.'; exit 1; }
+fi
 print "Omac installed. Backup: $backup"
+if [[ "${OMAC_REENGAGE_AFTER_INSTALL:-0}" != 1 ]]; then
+ print 'Omac remains disengaged. Choose Enter Omac and verify its page controls before using remote switching.'
+fi
 major="$(sw_vers -productVersion | cut -d. -f1)"
 permission_name='Accessibility'
 (( major < 27 )) || permission_name='Device Control and Data Access'

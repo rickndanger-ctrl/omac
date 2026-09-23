@@ -229,8 +229,9 @@ if CommandLine.arguments.contains("--apply-wallpaper") || CommandLine.arguments.
  let workspace=NSWorkspace.shared
  var original=(try? Data(contentsOf:wallpaperBackup)).flatMap{try? JSONSerialization.jsonObject(with:$0) as? [String:String]} ?? [:]
  let restoring=CommandLine.arguments.contains("--restore-wallpaper")
- let choice=(try? String(contentsOf:wallpaperChoice,encoding:.utf8)) ?? "storm-forge"
- guard ["obsidian","amber","pine","emerald-glass","storm-forge","crimson-etch"].contains(choice) else {exit(1)}
+ let savedChoice=(try? String(contentsOf:wallpaperChoice,encoding:.utf8)) ?? "silver-ice"
+ let choice=["amber-forge","silver-ice","jungle","sky","ghost","grim-reaper"].contains(savedChoice) ? savedChoice:"silver-ice"
+ if choice != savedChoice {try? choice.write(to:wallpaperChoice,atomically:true,encoding:.utf8)}
  let image=URL(fileURLWithPath:root+"/branding/wallpapers/omac-"+choice+".png")
  var failed=false
  for screen in NSScreen.screens {
@@ -298,8 +299,8 @@ final class OmacBrandBar {
  private var silhouette = NSBezierPath()
  init(logo: String) {
   if let image=NSImage(contentsOfFile:logo),let data=image.tiffRepresentation,let bitmap=NSBitmapImageRep(data:data) {
-   let left=Int(Double(bitmap.pixelsWide)*0.239), top=Int(Double(bitmap.pixelsHigh)*0.608)
-   let right=Int(Double(bitmap.pixelsWide)*0.760), bottom=Int(Double(bitmap.pixelsHigh)*0.752)
+   let left=Int(Double(bitmap.pixelsWide)*0.07), top=Int(Double(bitmap.pixelsHigh)*0.33)
+   let right=Int(Double(bitmap.pixelsWide)*0.93), bottom=Int(Double(bitmap.pixelsHigh)*0.60)
    for y in stride(from:top,to:bottom,by:2) {for x in stride(from:left,to:right,by:2) {
     if let c=bitmap.colorAt(x:x,y:y)?.usingColorSpace(.deviceRGB), c.greenComponent>0.48 && c.greenComponent>c.blueComponent*1.2 {
      silhouette.appendRect(NSRect(x:Double(x-left)/Double(right-left)*47,y:Double(bottom-y)/Double(bottom-top)*13,width:0.20,height:0.20))
@@ -505,12 +506,10 @@ class Delegate: NSObject,NSApplicationDelegate {
   }
   settings.submenu=settingsMenu;menu.addItem(settings)
   let appearance=NSMenuItem(title:"Omac Appearance",action:nil,keyEquivalent:"");let appearanceMenu=NSMenu()
-  for (title,value) in [("Emerald Glass","emerald-glass"),("Storm Forge","storm-forge"),("Crimson Etch","crimson-etch"),("Original Green Glass","obsidian"),("Amber Glass","amber"),("Silver Glass","pine")] {
+  for (title,value) in [("Amber Forge","amber-forge"),("Silver Ice","silver-ice"),("Jungle","jungle"),("Sky","sky"),("Ghost","ghost"),("Grim Reaper","grim-reaper")] {
    let entry=NSMenuItem(title:title,action:#selector(selectWallpaper(_:)),keyEquivalent:"");entry.representedObject=value;entry.target=self;appearanceMenu.addItem(entry)
   }
   appearanceMenu.addItem(.separator())
-  let animatedWallpaper=NSMenuItem(title:"Animated Wallpaper",action:#selector(toggleAnimatedWallpaper(_:)),keyEquivalent:"")
-  animatedWallpaper.target=self;animatedWallpaper.state=wallpaperEnabled() ? .on:.off;appearanceMenu.addItem(animatedWallpaper)
   let saver=NSMenuItem(title:"Wallpaper & Screen Saver…",action:#selector(openSettings(_:)),keyEquivalent:"")
   saver.representedObject="x-apple.systempreferences:com.apple.Wallpaper-Settings.extension";saver.target=self;appearanceMenu.addItem(saver)
   appearance.submenu=appearanceMenu;menu.addItem(appearance)
@@ -568,7 +567,7 @@ class Delegate: NSObject,NSApplicationDelegate {
  @objc func urlEvent(_ event:NSAppleEventDescriptor,reply:NSAppleEventDescriptor) {
   if let text=event.paramDescriptor(forKeyword:AEKeyword(keyDirectObject))?.stringValue,let url=URLComponents(string:text),url.host=="launch",let bundle=url.queryItems?.first(where:{$0.name=="bundle"})?.value {launchShelfApp(bundle);return}
 
-  if let text=event.paramDescriptor(forKeyword:AEKeyword(keyDirectObject))?.stringValue, let action=URL(string:text)?.host, ["exit","pause","enter","four","six","new","guide","menu","center","rescue","refocus","cycle-next","cycle-previous","shelf","shelf-add","shelf-tuck","place-left","place-right","wallpaper-toggle"].contains(action) {perform(action)}
+  if let text=event.paramDescriptor(forKeyword:AEKeyword(keyDirectObject))?.stringValue, let action=URL(string:text)?.host, ["exit","pause","enter","four","six","new","guide","menu","center","rescue","refocus","cycle-next","cycle-previous","shelf","shelf-add","shelf-tuck","place-left","place-right"].contains(action) {perform(action)}
  }
  @objc func showThemedMenu(_ sender:Any?) {
   if menuPanel.isVisible {menuPanel.dismiss();return}
@@ -692,7 +691,6 @@ class Delegate: NSObject,NSApplicationDelegate {
   } catch {shelfError(error)}
  }
  func perform(_ action:String) {
-  if action=="wallpaper-toggle" {setAnimatedWallpaper(!wallpaperEnabled());return}
   if action=="cycle-next" || action=="cycle-previous" {
    do {try windowCycler.cycle(action=="cycle-next" ? .next:.previous)} catch {shelfError(error)}
    return
