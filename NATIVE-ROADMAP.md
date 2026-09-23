@@ -45,7 +45,7 @@ Sources:
 
 Show only the Omac wordmark and page buttons 1–5 for Omac. Identify and hide redundant window-manager indicators (user described A, 6, and additional symbols) after confirming their owners. Preserve unrelated apps and the existing Mac switcher. Verify on both physical displays; the remote virtual display is not sufficient proof. Pending implementation.
 
-The current menu-bar wordmark still samples the older green pixel lettering from `branding/Omac.png`. In the branding cleanup, use the approved clean OMAC lettering from the selected wallpaper direction, without an Apple mark, while keeping the existing page controls. The final wordmark choice is still pending, so do not replace the running menu image or generate competing variants yet.
+The source now draws smooth bold OMAC lettering with the selected wallpaper's accent and keeps page controls 1–5. It no longer samples the older green pixel logo. The review build contains this change; the installed menu and physical displays still need visual acceptance. A future custom wordmark asset can be considered after a final choice, without generating competing variants now.
 
 ## Immediate priority: dismissible idle animation
 
