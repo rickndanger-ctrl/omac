@@ -274,8 +274,7 @@ def switch_page(target):
   else:_restore_mixed_data(data)
  # Clear both the departing remote-control page and any stale destination.
  # Otherwise an empty page can focus the parked viewer on activation.
- if target!=current:
-  evacuate_page_remote_viewers()
+ evacuate_page_remote_viewers()
  aero('workspace',target)
  return f'Switched to page {target}.'
 
@@ -297,9 +296,10 @@ def evacuate_remote_viewers(workspace):
    aero('move-node-to-workspace','--window-id',str(window['window-id']),REMOTE_WORKSPACE)
 def move_focused_to_page(target):
  if target not in ('1','2','3','4','5'): raise RuntimeError('Page must be 1 through 5.')
- focused=json.loads(aero('list-windows','--focused','--format','%{window-id} %{app-pid} %{workspace}','--json'))
+ focused=json.loads(aero('list-windows','--focused','--format','%{window-id} %{app-pid} %{app-name} %{app-bundle-id} %{workspace}','--json'))
  if not focused: raise RuntimeError('Focus a window first.')
  window=focused[0];data=_read_mixed()
+ if is_remote_viewer(window): raise RuntimeError('Screen Sharing stays outside Omac pages.')
  if target==window.get('workspace'):return f'Focused window is already on page {target}.'
  if data:
   member=next((item for item in data.get('members',[]) if item.get('window-id')==window.get('window-id') and item.get('app-pid')==window.get('app-pid')),None)
@@ -490,26 +490,20 @@ def arrange(workspace=None):
  ids=[str(w['window-id']) for w in tiles]
  focused=aero('list-windows','--focused','--format','%{window-id}',check=False)
  target=focused if focused in ids else ids[0]
- # One request avoids repainting between dozens of individual CLI invocations.
+ # AeroSpace inventories windows in DFS tree order. Apply the final pair joins
+ # and balance in the same request as flattening: separate CLI requests exposed
+ # a temporary row of tall columns before the finished grid appeared.
  commands=[]
  for wid in ids:
   commands.extend([f'fullscreen off --window-id {wid}',
                    f'layout --window-id {wid} tiling'])
  commands.extend([f'workspace {workspace}',f'focus --window-id {ids[0]}',
                   'flatten-workspace-tree',f'layout --workspace {workspace} --root h_tiles'])
+ if len(ids)>2:
+  for i in range(0,len(ids)-1,2):
+   commands.append(f'join-with --window-id {ids[i]} right')
+ commands.extend([f'balance-sizes --workspace {workspace}',f'focus --window-id {target}'])
  aero('eval','; '.join(commands))
- # Query the actual tree order after flattening; title order need not match it.
- ordered=[]
- # DFS also counts floating windows, including the parked remote viewer.
- for index in range(len(windows())):
-  aero('focus','--dfs-index',str(index),check=False)
-  wid=aero('list-windows','--focused','--format','%{window-id}',check=False)
-  if wid in ids and wid not in ordered: ordered.append(wid)
- if len(ordered)>2:
-  for i in range(0,len(ordered)-1,2):
-   aero('join-with','--window-id',ordered[i],'right')
- aero('balance-sizes','--workspace',workspace)
- aero('focus','--window-id',target)
  return terminal_count
 
 def start_services():

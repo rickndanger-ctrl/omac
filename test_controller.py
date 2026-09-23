@@ -79,17 +79,13 @@ class Lifecycle(unittest.TestCase):
    run.assert_not_called()
  def test_grid_reset_is_one_batch_and_preserves_focus(self):
   tiles=[{'window-id':i,'window-title':'ACC · '+str(i),'workspace':'1','window-layout':'h_tiles'} for i in range(1,7)]
-  cursor=['3']
-  def fake_aero(*args,**kwargs):
-   if args[:2]==('focus','--dfs-index'):cursor[0]=str(6-int(args[2]))
-   return cursor[0]
-  with patch.object(c,'terminal_windows',return_value=tiles),patch.object(c,'windows',return_value=list(reversed(tiles))),patch.object(c,'aero',side_effect=fake_aero) as aero,patch.object(c,'page',return_value='1'):
+  with patch.object(c,'terminal_windows',return_value=tiles),patch.object(c,'windows',return_value=list(reversed(tiles))),patch.object(c,'aero',return_value='3') as aero,patch.object(c,'page',return_value='1'):
    self.assertEqual(c.arrange(),6)
    batches=[call for call in aero.call_args_list if call.args[0]=='eval']
    self.assertEqual(len(batches),1)
-   self.assertEqual(aero.call_args_list[-1].args,('focus','--window-id','3'))
-   self.assertEqual([call.args[2] for call in aero.call_args_list if call.args[0]=='join-with'],['6','4','2'])
-   self.assertFalse(any(call.args[0]=='move' for call in aero.call_args_list))
+   batch=batches[0].args[1]
+   self.assertIn('flatten-workspace-tree; layout --workspace 1 --root h_tiles; join-with --window-id 6 right; join-with --window-id 4 right; join-with --window-id 2 right; balance-sizes --workspace 1; focus --window-id 3',batch)
+   self.assertFalse(any(call.args[0] in ('move','join-with','balance-sizes') for call in aero.call_args_list))
  def test_pause_preserves_sessions_and_snapshot(self):
   (c.STATE/'windows.json').write_text('[]')
   with patch.object(c,'aero') as aero,patch.object(c,'run') as run:
@@ -145,6 +141,21 @@ class Pages(unittest.TestCase):
   self.assertEqual(set(calls[1:-1]),{
    ('move-node-to-workspace','--window-id','5418',c.REMOTE_WORKSPACE),
    ('move-node-to-workspace','--window-id','5419',c.REMOTE_WORKSPACE)})
+ def test_all_five_pages_and_same_page_evacuate_remote_before_activation(self):
+  for origin in map(str,range(1,6)):
+   for target in map(str,range(1,6)):
+    viewer={'window-id':5418,'app-name':'Screen Sharing','app-bundle-id':c.REMOTE_VIEWER_BUNDLE,'workspace':origin}
+    def fake_aero(*args): return origin if args==('list-workspaces','--focused') else ''
+    with self.subTest(origin=origin,target=target),patch.object(c,'aero',side_effect=fake_aero) as aero,patch.object(c,'windows',return_value=[viewer]):
+     c.switch_page(target)
+     self.assertLess(aero.call_args_list.index(next(call for call in aero.call_args_list if call.args[0]=='move-node-to-workspace')),
+                     aero.call_args_list.index(next(call for call in aero.call_args_list if call.args[0]=='workspace')))
+ def test_remote_viewer_cannot_be_moved_into_numbered_page(self):
+  viewer={'window-id':5418,'app-pid':900,'app-name':'Screen Sharing','app-bundle-id':c.REMOTE_VIEWER_BUNDLE,'workspace':'Omac-Remote'}
+  with patch.object(c,'aero',return_value=__import__('json').dumps([viewer])) as aero,patch.object(c,'_read_mixed',return_value=None):
+   with self.assertRaisesRegex(RuntimeError,'stays outside Omac pages'):
+    c.move_focused_to_page('1')
+  self.assertFalse(any(call.args[0]=='move-node-to-workspace' for call in aero.call_args_list))
  def test_restore_rejects_recycled_window_ids(self):
   import json
   with tempfile.TemporaryDirectory() as directory,patch.object(c,'STATE',Path(directory)):
