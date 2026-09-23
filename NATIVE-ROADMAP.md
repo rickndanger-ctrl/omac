@@ -45,6 +45,8 @@ Sources:
 
 Show only the Omac wordmark and page buttons 1–5 for Omac. Identify and hide redundant window-manager indicators (user described A, 6, and additional symbols) after confirming their owners. Preserve unrelated apps and the existing Mac switcher. Verify on both physical displays; the remote virtual display is not sufficient proof. Pending implementation.
 
+The current menu-bar wordmark still samples the older green pixel lettering from `branding/Omac.png`. In the branding cleanup, use the approved clean OMAC lettering from the selected wallpaper direction, without an Apple mark, while keeping the existing page controls. The final wordmark choice is still pending, so do not replace the running menu image or generate competing variants yet.
+
 ## Immediate priority: dismissible idle animation
 
 User approved a normal Omac desktop overlay with Return to desktop on every screen and Escape dismissal, preserving automatic iPhone Mirroring. Do not attempt to overlay macOS secure login or bypass authentication. System screensaver and display-sleep behavior must be explicitly configured and verified before claiming password-free dismissal. Actual lock and restart still require authentication. Prototype first, then live verification, then idle activation under the existing supervised app.
