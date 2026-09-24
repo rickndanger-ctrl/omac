@@ -33,10 +33,21 @@ window-created on the app, and observe the window through its own process id.
   days in `omac-native`; see its `CLOSURE-FOCUS-CHECKPOINT.md`. Check both repos when one
   hits an ordering race.
 
-**Verification gap.** This session ran on Linux with no Swift toolchain, so the change is
-compile-unverified until `./package.sh` runs on a Mac. Acceptance: with the border on,
+**Verification.** Written on a Linux cloud session with no Swift compiler; `./package.sh`
+then passed on the Mac (compile, codesign, 66 Python tests, DMG) at b31b301. Hands-on
+acceptance still pending: with the border on,
 open 6+ windows in one app, hold Command-W until one remains; the border must stay on the
 surviving focused window the whole time, and must clear when the last window closes.
+
+## 2. Fresh clone cannot build the screensaver (2026-09-24)
+
+**Problem.** `branding/screensaver/build.sh` expects a sibling folder `../omac-visual-concepts`
+outside the repo, so `./package.sh` fails on a fresh checkout until that folder is placed
+next to it.
+
+**Rule.** A build must not depend on files outside the repository. Either vendor the needed
+concept assets into `branding/`, or make the screensaver step skip with a clear message when
+the sibling folder is absent. Until fixed: clone `omac-visual-concepts` beside `omac`.
 
 ## Working agreements
 
