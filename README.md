@@ -1,6 +1,6 @@
 # Omac
 
-Omac is a keyboard-first macOS workspace built around AeroSpace, Ghostty, native apps, persistent pages, an app shelf, focus highlighting, and optional animated wallpaper. This repository currently builds a portable engineering preview. The signed bundle has been installed and exercised on two development Macs; it is not notarized or production-certified. **Read [DISTRIBUTION.md](DISTRIBUTION.md) before sharing or installing a build.**
+Omac is a keyboard-first macOS workspace built around AeroSpace, Ghostty, native apps, persistent pages, an app shelf, focus highlighting, and optional animated wallpaper. This repository currently builds a portable engineering preview. The signed bundle has been installed and exercised on two development Macs; it is not notarized or production-certified. **Read [DISTRIBUTION.md](DISTRIBUTION.md) before sharing or installing a build, and [LESSONS.md](LESSONS.md) before editing.**
 
 ## Build
 

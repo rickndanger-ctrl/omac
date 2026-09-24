@@ -10,6 +10,66 @@ struct FocusBorderGeometry {
     }
 }
 
+/// Which Accessibility notification reached the controller, stripped of AX types so the
+/// response rules below can be read (and reasoned about) without a live observer.
+enum FocusBorderEvent: Equatable {
+    case focusedWindowChanged, mainWindowChanged, windowCreated
+    case moved, resized, destroyed, miniaturized
+    case other
+
+    init(_ notification: String) {
+        switch notification {
+        case kAXFocusedWindowChangedNotification: self = .focusedWindowChanged
+        case kAXMainWindowChangedNotification: self = .mainWindowChanged
+        case kAXWindowCreatedNotification: self = .windowCreated
+        case kAXMovedNotification: self = .moved
+        case kAXResizedNotification: self = .resized
+        case kAXUIElementDestroyedNotification: self = .destroyed
+        case kAXWindowMiniaturizedNotification: self = .miniaturized
+        default: self = .other
+        }
+    }
+}
+
+enum FocusBorderResponse: Equatable {
+    /// A callback from an observer that has already been replaced. Rapid Command-W closes
+    /// deliver the old window's "destroyed" after the new window is already outlined;
+    /// acting on it hid the live outline. Stale callbacks are dropped, never acted on.
+    case ignore
+    /// Re-read the frontmost application's focused window and outline it.
+    case resync
+    /// The outlined window is gone or hidden: hide now, then re-read the focused window
+    /// because the application may not announce its replacement focus.
+    case hideThenResync
+    case updateFrame
+}
+
+/// Pure response rules. `fromCurrentObserver` is false when the callback came from an
+/// observer this controller has since torn down; `matchesObservedWindow` is false when a
+/// window-level callback names a different element than the one currently outlined.
+struct FocusBorderEventPolicy {
+    static func response(to event: FocusBorderEvent,
+                         fromCurrentObserver: Bool,
+                         matchesObservedWindow: Bool) -> FocusBorderResponse {
+        guard fromCurrentObserver else { return .ignore }
+        switch event {
+        case .focusedWindowChanged, .mainWindowChanged, .windowCreated:
+            return .resync
+        case .destroyed, .miniaturized:
+            return matchesObservedWindow ? .hideThenResync : .ignore
+        case .moved, .resized:
+            return matchesObservedWindow ? .updateFrame : .ignore
+        case .other:
+            return .ignore
+        }
+    }
+
+    /// Bounded retry schedule (seconds) used when the focused window cannot be read yet.
+    /// During a burst of closes the application briefly reports no focused window, or the
+    /// dying one; a handful of short retries covers that transition without polling.
+    static let resyncDelays: [TimeInterval] = [0.05, 0.15, 0.4, 0.9]
+}
+
 private final class FocusBorderView: NSView {
     let accent = NSColor(calibratedRed: 1.0, green: 0.82, blue: 0.12, alpha: 1.0)
     private let edgeInset: CGFloat = 4
@@ -41,7 +101,9 @@ final class FocusBorderController {
     private var workspaceTokens: [NSObjectProtocol] = []
     private var appObserver: AXObserver?
     private var windowObserver: AXObserver?
+    private var observedApplication: AXUIElement?
     private var observedWindow: AXUIElement?
+    private var pendingResyncs: [DispatchWorkItem] = []
     private(set) var isEngaged = false
     private(set) var isEnabled = true
 
@@ -67,6 +129,7 @@ final class FocusBorderController {
         })
         workspaceTokens.append(center.addObserver(forName: NSWorkspace.sessionDidResignActiveNotification,
                                                    object: nil, queue: .main) { [weak self] _ in
+            self?.cancelPendingResyncs()
             self?.panel.orderOut(nil)
         })
         workspaceTokens.append(center.addObserver(forName: NSWorkspace.sessionDidBecomeActiveNotification,
@@ -100,23 +163,34 @@ final class FocusBorderController {
             stateDirectory.appendingPathComponent("focus-border.disabled").path)
     }
 
-    private func stopObserving() {
-        if let appObserver {
-            CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(appObserver), .commonModes)
-        }
+    private func cancelPendingResyncs() {
+        pendingResyncs.forEach { $0.cancel() }
+        pendingResyncs.removeAll()
+    }
+
+    private func stopWindowObserver() {
         if let windowObserver {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(windowObserver), .commonModes)
         }
-        appObserver = nil
         windowObserver = nil
         observedWindow = nil
+    }
+
+    private func stopObserving() {
+        cancelPendingResyncs()
+        stopWindowObserver()
+        if let appObserver {
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(appObserver), .commonModes)
+        }
+        appObserver = nil
+        observedApplication = nil
     }
 
     private func observeFrontmostApplication() {
         guard isEngaged, isEnabled,
               let app = NSWorkspace.shared.frontmostApplication,
               app.processIdentifier != ProcessInfo.processInfo.processIdentifier else {
-            panel.orderOut(nil); return
+            stopObserving(); panel.orderOut(nil); return
         }
 
         stopObserving()
@@ -125,64 +199,98 @@ final class FocusBorderController {
         guard AXObserverCreate(app.processIdentifier, focusBorderAXCallback, &observer) == .success,
               let observer else { panel.orderOut(nil); return }
         appObserver = observer
-        AXObserverAddNotification(observer, application, kAXFocusedWindowChangedNotification as CFString,
-                                  Unmanaged.passUnretained(self).toOpaque())
+        observedApplication = application
+        // Focus changes are the primary signal. Main-window and window-created changes cover
+        // applications that replace a closed window without announcing a new focused window.
+        for notification in [kAXFocusedWindowChangedNotification, kAXMainWindowChangedNotification,
+                             kAXWindowCreatedNotification] {
+            AXObserverAddNotification(observer, application, notification as CFString,
+                                      Unmanaged.passUnretained(self).toOpaque())
+        }
         CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .commonModes)
-        observeFocusedWindow(in: application)
+        resyncFocusedWindow()
     }
 
-    fileprivate func observeFocusedWindow(in application: AXUIElement? = nil) {
+    /// Outline the application's current focused window. If the application is mid-transition
+    /// (a window just closed and the next one is not yet focused), retry on a short bounded
+    /// schedule instead of giving up until the next notification.
+    private func resyncFocusedWindow(attempt: Int = 0) {
+        cancelPendingResyncs()
         guard isEngaged, isEnabled else { panel.orderOut(nil); return }
-        if let windowObserver {
-            CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(windowObserver), .commonModes)
-            self.windowObserver = nil
-        }
-        let appElement: AXUIElement
-        if let application { appElement = application }
-        else if let app = NSWorkspace.shared.frontmostApplication {
-            appElement = AXUIElementCreateApplication(app.processIdentifier)
-        } else { panel.orderOut(nil); return }
+        if outlineFocusedWindow() { return }
+        panel.orderOut(nil)
+        guard attempt < FocusBorderEventPolicy.resyncDelays.count, observedApplication != nil else { return }
+        let work = DispatchWorkItem { [weak self] in self?.resyncFocusedWindow(attempt: attempt + 1) }
+        pendingResyncs.append(work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + FocusBorderEventPolicy.resyncDelays[attempt],
+                                      execute: work)
+    }
 
+    /// Returns true when a live focused window with a usable frame is now outlined.
+    private func outlineFocusedWindow() -> Bool {
+        guard let appElement = observedApplication else { return false }
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &value) == .success,
-              let value, CFGetTypeID(value) == AXUIElementGetTypeID() else {
-            panel.orderOut(nil); return
-        }
+              let value, CFGetTypeID(value) == AXUIElementGetTypeID() else { return false }
         let window = unsafeBitCast(value, to: AXUIElement.self)
-        observedWindow = window
+        guard let frame = Self.frame(of: window) else { return false }
 
-        if let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier {
-            var observer: AXObserver?
-            if AXObserverCreate(pid, focusBorderAXCallback, &observer) == .success, let observer {
-                windowObserver = observer
-                for notification in [kAXMovedNotification, kAXResizedNotification,
-                                     kAXUIElementDestroyedNotification, kAXWindowMiniaturizedNotification] {
-                    AXObserverAddNotification(observer, window, notification as CFString,
-                                              Unmanaged.passUnretained(self).toOpaque())
-                }
-                CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .commonModes)
+        // Observe the window through its own process, not whichever app is frontmost now.
+        var pid: pid_t = 0
+        guard AXUIElementGetPid(window, &pid) == .success else { return false }
+
+        stopWindowObserver()
+        observedWindow = window
+        var observer: AXObserver?
+        if AXObserverCreate(pid, focusBorderAXCallback, &observer) == .success, let observer {
+            windowObserver = observer
+            for notification in [kAXMovedNotification, kAXResizedNotification,
+                                 kAXUIElementDestroyedNotification, kAXWindowMiniaturizedNotification] {
+                AXObserverAddNotification(observer, window, notification as CFString,
+                                          Unmanaged.passUnretained(self).toOpaque())
             }
+            CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .commonModes)
         }
-        updateFrame()
+        show(frame: frame)
+        return true
     }
 
-    fileprivate func handleAXNotification(_ notification: CFString) {
-        if notification as String == kAXFocusedWindowChangedNotification {
-            observeFocusedWindow()
-        } else if notification as String == kAXUIElementDestroyedNotification ||
-                    notification as String == kAXWindowMiniaturizedNotification {
+    fileprivate func handleAXNotification(_ notification: CFString,
+                                          from observer: AXObserver,
+                                          element: AXUIElement) {
+        let fromCurrent = isCurrent(observer)
+        let matches = observedWindow.map { CFEqual($0, element) } ?? false
+        switch FocusBorderEventPolicy.response(to: FocusBorderEvent(notification as String),
+                                               fromCurrentObserver: fromCurrent,
+                                               matchesObservedWindow: matches) {
+        case .ignore:
+            return
+        case .resync:
+            resyncFocusedWindow()
+        case .hideThenResync:
+            stopWindowObserver()
             panel.orderOut(nil)
-        } else {
+            resyncFocusedWindow()
+        case .updateFrame:
             updateFrame()
         }
     }
 
+    private func isCurrent(_ observer: AXObserver) -> Bool {
+        if let appObserver, CFEqual(appObserver, observer) { return true }
+        if let windowObserver, CFEqual(windowObserver, observer) { return true }
+        return false
+    }
+
     private func updateFrame() {
-        guard let window = observedWindow,
-              let frame = Self.frame(of: window),
-              let primaryTop = NSScreen.screens.first?.frame.maxY else {
+        guard let window = observedWindow, let frame = Self.frame(of: window) else {
             panel.orderOut(nil); return
         }
+        show(frame: frame)
+    }
+
+    private func show(frame: CGRect) {
+        guard let primaryTop = NSScreen.screens.first?.frame.maxY else { panel.orderOut(nil); return }
         panel.setFrame(FocusBorderGeometry.appKitFrame(axFrame: frame, primaryScreenTop: primaryTop, outset: 4),
                        display: true)
         panel.orderFrontRegardless()
@@ -210,5 +318,7 @@ private func focusBorderAXCallback(_ observer: AXObserver,
                                    _ context: UnsafeMutableRawPointer?) {
     guard let context else { return }
     let controller = Unmanaged<FocusBorderController>.fromOpaque(context).takeUnretainedValue()
-    DispatchQueue.main.async { controller.handleAXNotification(notification) }
+    // Delivery is asynchronous, so by the time this runs the observer may have been replaced.
+    // The controller checks that before acting; see FocusBorderEventPolicy.
+    DispatchQueue.main.async { controller.handleAXNotification(notification, from: observer, element: element) }
 }
