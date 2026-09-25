@@ -39,6 +39,8 @@ header{padding:22px 0;display:flex;justify-content:space-between;align-items:cen
 .g{background:var(--green);box-shadow:0 0 8px var(--green)}.y{background:var(--yellow);box-shadow:0 0 8px var(--yellow)}
 .r{background:var(--red);box-shadow:0 0 8px var(--red)}.k{background:var(--gray)}
 .pg{font-family:"Russo One",Inter,sans-serif;font-size:11px;color:var(--muted)}
+.phone{max-width:340px;margin:0 auto 12px;border-radius:28px;overflow:hidden;border:2px solid var(--line);box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 40px rgba(255,190,85,.15);background:#000}
+.phone video{width:100%;display:block;aspect-ratio:9/16}
 .skyhero{margin:4px auto 28px;border-radius:16px;overflow:hidden;border:1px solid var(--line);max-width:960px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
 .skyhero img{width:100%;display:block}
 .shot{margin:28px auto 0;border-radius:14px;overflow:hidden;border:1px solid var(--line);max-width:960px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
@@ -88,8 +90,12 @@ footer{border-top:1px solid var(--line);padding:24px 0 40px;color:var(--muted);f
   
 </section>
 
+<h2 class="sec">Just say it</h2>
+<p class="sub">Meet Jev. Tell your Mac what to do: new terminal, open Chrome on page 3, switch to your other Mac. Real footage, real voice.</p>
+<div class="phone"><video src="jev-teaser.mp4" poster="jev-teaser-poster.jpg" controls playsinline preload="none"></video></div>
+
 <h2 class="sec">One light per agent</h2>
-<p class="sub">Claude Code, Codex, Hermes and your own agents report in. Each gets its own light with its app icon and page number. A soft chime plays when one needs you.</p>
+<p class="sub">Claude Code, Codex, Hermes and your own agents report in. Each gets its own light with its app icon and page number. Pick a sound for each light, and repeat it every minute if you like, so you never miss the one that needs you.</p>
 <div class="legend">
   <div><span class="dot g"></span><span><b>Green</b> — working</span></div>
   <div><span class="dot y"></span><span><b>Yellow</b> — needs your approval or answer</span></div>
@@ -102,8 +108,8 @@ footer{border-top:1px solid var(--line);padding:24px 0 40px;color:var(--muted);f
 <section class="grid">
   <div class="card"><h3>Tile without thinking</h3><p><kbd>⌘</kbd> <kbd>Return</kbd> opens a terminal and it snaps into place. Five pages on <kbd>⌘1</kbd>–<kbd>⌘5</kbd>.</p></div>
   <div class="card"><h3>Never touch the mouse</h3><p><kbd>⌘</kbd> arrows move focus, and a bright outline shows where you are.</p></div>
-  <div class="card"><h3>Speak an order</h3><p><kbd>⌃⌥J</kbd>, say "go to page 2" or "close Safari". Voice orders are off until you turn them on, and closing anything asks first.</p></div>
-  <div class="card"><h3>Two Macs, one keyboard</h3><p><kbd>⌃⌥1</kbd> and <kbd>⌃⌥2</kbd> jump between your Macs from either side.</p></div>
+  <div class="card"><h3>Speak an order</h3><p>Press <kbd>⌃⌥J</kbd> or turn on always-listening and say “Jev, open Chrome on page 3”. Audio stays on your Mac. Bring your own TypeSafe AI key, or skip Jev entirely.</p></div>
+  <div class="card"><h3>One Mac or two</h3><p>Setup asks once. With two Macs, a guided pairing lets <kbd>⌃⌥1</kbd> / <kbd>⌃⌥2</kbd>, or just “switch to Mac 2”, move you between them.</p></div>
   <div class="card"><h3>It remembers</h3><p>Quit, update or restart OMAC. Your windows go back to their pages by themselves.</p></div>
   <div class="card"><h3>Native and careful</h3><p>Swift and AppKit, notarized by Apple. Touches only the windows you choose, and undoes any move a window refuses.</p></div>
 </section>
