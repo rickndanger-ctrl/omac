@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Omac app icon, emerald geometric wordmark">
+  <defs>
+    <linearGradient id="base" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#18252a"/><stop offset=".52" stop-color="#091316"/><stop offset="1" stop-color="#02080a"/></linearGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#e3f2ec"/><stop offset=".16" stop-color="#7caaa0"/><stop offset=".46" stop-color="#1d4b47"/><stop offset=".55" stop-color="#a8d3bd"/><stop offset="1" stop-color="#3f7565"/></linearGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#b9ffe0"/><stop offset=".4" stop-color="#48cd92"/><stop offset="1" stop-color="#07533d"/></linearGradient>
+    <radialGradient id="halo"><stop stop-color="#2ee8a0" stop-opacity=".26"/><stop offset="1" stop-color="#2ee8a0" stop-opacity="0"/></radialGradient>
+    <filter id="glow" x="-40%" y="-100%" width="180%" height="300%"><feGaussianBlur stdDeviation="21"/></filter>
+    <clipPath id="round"><rect x="32" y="32" width="960" height="960" rx="206"/></clipPath>
+  </defs>
+  <g clip-path="url(#round)">
+    <rect width="1024" height="1024" fill="url(#base)"/>
+    <circle cx="512" cy="490" r="495" fill="url(#halo)"/>
+    <path d="M0 715 1024 365M0 820 1024 470M0 923 1024 573" stroke="#61cba2" stroke-opacity=".11" stroke-width="2"/>
+    <path d="M104 208h816M104 816h816" stroke="#70bba4" stroke-opacity=".25" stroke-width="2"/>
+    <rect x="103" y="103" width="818" height="818" rx="155" fill="none" stroke="url(#edge)" stroke-opacity=".47" stroke-width="4"/>
+    <path d="M217 300h590M217 724h590" stroke="#97cbb8" stroke-opacity=".28" stroke-width="1"/>
+    <path d="M255 502h77v-53h-77z M382 449v53h77v-53 M509 502h77v-53h-77 M713 449h-77v53h77" fill="none" stroke="#40ec9b" stroke-opacity=".4" stroke-width="35" filter="url(#glow)"/>
+    <g transform="translate(191 424) scale(1.07)" fill="none" stroke="url(#metal)" stroke-width="24" stroke-linecap="square" stroke-linejoin="miter">
+      <path d="M18 0h82v146H18z"/>
+      <path d="M151 146V0l50 85 50-85v146"/>
+      <path d="M301 146 348 0h40l47 146M317 94h103"/>
+      <path d="M590 2H488v142h102"/>
+    </g>
+    <g transform="translate(191 424) scale(1.07)" fill="none" stroke="#a9ffd6" stroke-opacity=".82" stroke-width="3" stroke-linecap="square">
+      <path d="M18 0h82M151 0v146M301 146 348 0h40M488 2h102"/>
+    </g>
+    <path d="M332 652h360" stroke="#65e7ac" stroke-opacity=".65" stroke-width="3"/>
+    <path d="M405 677h214" stroke="#89d7b1" stroke-opacity=".35" stroke-width="1"/>
+  </g>
+</svg>
