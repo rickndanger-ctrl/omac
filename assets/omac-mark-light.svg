@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 70" role="img" aria-label="Omac mark">
+  <!-- Outline in #B8906A on dark, #B8906A on light, #141414 for print; the window is smoked glass, the prompt stays #B8906A. -->
+  <defs><linearGradient id="omac-smoke" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2A2A2F"/><stop offset="1" stop-color="#16161A"/></linearGradient></defs>
+  <rect x="36" y="10" width="58" height="50" rx="9" fill="url(#omac-smoke)" opacity="0.7"/>
+  <path d="M4 24 H26" stroke="#B8906A" stroke-width="4" stroke-linecap="round" opacity="0.3"/>
+  <path d="M10 35 H26" stroke="#B8906A" stroke-width="4" stroke-linecap="round" opacity="0.55"/>
+  <path d="M6 46 H26" stroke="#B8906A" stroke-width="4" stroke-linecap="round" opacity="0.3"/>
+  <rect x="36" y="10" width="58" height="50" rx="9" fill="none" stroke="#B8906A" stroke-width="5"/>
+  <path d="M36 22 H94" stroke="#B8906A" stroke-width="5"/>
+  <path d="M48 31 L56 38 L48 45" fill="none" stroke="#D2B48C" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M61 46 H74" stroke="#D2B48C" stroke-width="4.5" stroke-linecap="round"/>
+</svg>

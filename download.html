@@ -1,0 +1,50 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Download Omac</title><meta name="description" content="Omac is a tiling window manager for Mac with its own terminal and a voice partner, Jev.">
+<link rel="icon" href="assets/omac-mark-light.svg"><link rel="stylesheet" href="assets/site.css"></head><body>
+<header class="top"><div class="wrap nav">
+<a class="brand" href="index.html"><img src="assets/omac-mark-light.svg" alt=""><span>Omac</span></a>
+<nav class="links"><a href="guide.html" >Guide</a><a href="plugins.html" >Plugins</a><a class="btn btn-dark" href="download.html">Download</a></nav>
+</div></header>
+<main>
+<div class="wrap hero" style="padding-bottom:40px">
+  <div class="eyebrow">Download</div>
+  <h1 style="margin-top:18px">Pick your Omac.</h1>
+  <p class="lead">Every version is the full window manager, terminal and Jev. Pay only for convenience and creativity.</p>
+</div>
+<div class="wrap"><div class="tiers">
+  <div class="tier">
+    <div class="name">Free</div>
+    <div class="price">$0</div>
+    <p class="desc">The whole app, straight from GitHub. You update it yourself.</p>
+    <ul><li>Tiling, pages and Omac Terminal</li><li>Jev voice and typed orders</li><li>All built-in themes</li><li class="no">Automatic updates</li><li class="no">Plugins</li></ul>
+    <div class="cmd"><code>curl -sL $(curl -s https://api.github.com/repos/rickndanger-ctrl/omac/releases/latest | grep -o 'https://[^"]*\.dmg' | head -1) -o ~/Downloads/Omac.dmg && open ~/Downloads/Omac.dmg</code><button type="button">Copy</button></div>
+    <a class="btn btn-line" href="https://github.com/rickndanger-ctrl/omac/releases/latest">Download from GitHub</a>
+  </div>
+  <div class="tier featured">
+    <span class="badge">Most popular</span>
+    <div class="name">Supporter</div>
+    <div class="price">$1<small>once</small></div>
+    <p class="desc">Everything in Free, kept up to date for you.</p>
+    <ul><li>Everything in Free</li><li>Automatic updates (soon)</li><li>Install plugins (soon)</li><li class="no">Create your own plugins</li></ul>
+    <span class="btn btn-line" aria-disabled="true" style="justify-content:center;cursor:default;color:var(--ink-3)!important">Coming soon</span>
+  </div>
+  <div class="tier">
+    <div class="name">Creator</div>
+    <div class="price">$1<small>/ month</small></div>
+    <p class="desc">Make Omac completely yours. Functions and logo stay Omac; everything else is yours to shape.</p>
+    <ul><li>Everything in Supporter</li><li>Create plugins (soon)</li><li>Custom wallpapers and themes</li><li>Early builds</li></ul>
+    <span class="btn btn-line" aria-disabled="true" style="justify-content:center;cursor:default;color:var(--ink-3)!important">Coming soon</span>
+  </div>
+</div>
+<p class="muted" style="text-align:center;font-size:14px;margin-top:22px">Requires macOS 14 or later. Signed and notarized by Apple.</p>
+</div>
+
+<section><div class="wrap" style="max-width:760px">
+  <h2 style="margin-bottom:22px">Questions</h2>
+  <details><summary>Is the free version really the full app?</summary><p>Yes. Tiling, pages, Omac Terminal, Jev and every built-in theme. Paid versions add updates, plugins and creation tools.</p></details>
+  <details><summary>What can I change as a Creator?</summary><p>Wallpapers, themes, and your own plugins. Omac's core functions and logo stay the same so it always works the way you expect.</p></details>
+  <details><summary>Does Jev need an API key?</summary><p>Jev uses a key you add once in Settings. Simple window moves work offline.</p></details>
+  <details><summary>Can I cancel the monthly plan?</summary><p>Any time. You keep the app and everything you made.</p></details>
+</div></section>
+</main>
+<footer><div class="wrap row"><a class="brand" href="index.html"><img src="assets/omac-mark-light.svg" alt=""><span>Omac</span></a><nav><a href="guide.html">Guide</a><a href="plugins.html">Plugins</a><a href="download.html">Download</a><a href="https://github.com/rickndanger-ctrl/omac">GitHub</a></nav><span>© 2026 Omac. Made for macOS.</span></div></footer><script src="assets/site.js"></script></body></html>

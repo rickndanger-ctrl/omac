@@ -1,137 +1,55 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>OMAC — your Mac, keyboard-first. Your agents, in view.</title>
-<meta name="description" content="Keyboard-first tiling for macOS with a menu-bar light for every AI agent. Founders get it for $1 a month.">
-<link rel="icon" href="icon.svg">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-<style>
-:root{--bg:#0a1730;--bg2:#10244a;--fg:#f6f8fc;--muted:#b3c2da;--neon:#ffbe55;--neon-dim:#b9822f;--card:#12284f;--line:#27477a;
-  --green:#34d058;--yellow:#ffd23f;--red:#ff4d4d;--gray:#6b7a74}
-*{box-sizing:border-box}
-html{scroll-behavior:smooth}
-body{margin:0;background:radial-gradient(1200px 700px at 50% -10%,#3a6db3 0%,#16336a 35%,var(--bg) 75%) fixed,var(--bg);color:var(--fg);
-  font:17px/1.6 Inter,-apple-system,BlinkMacSystemFont,sans-serif;overflow-x:hidden}
-a{color:var(--neon)}
-.wrap{max-width:1080px;margin:0 auto;padding:0 16px}
-.px{font-family:"Russo One",Inter,sans-serif;letter-spacing:.02em}
-header{padding:22px 0;display:flex;justify-content:space-between;align-items:center;gap:12px}
-.logo{font-family:"Russo One",Inter,sans-serif;font-weight:700;font-size:28px;background:linear-gradient(180deg,#ffffff,#c9d3e3 55%,#8e9bb3);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none;filter:drop-shadow(0 0 8px rgba(255,190,85,.45));text-decoration:none}
-.cta{display:inline-block;background:var(--neon);color:#2a1600;font-weight:800;padding:16px 30px;border-radius:10px;text-decoration:none;font-size:18px;
-  box-shadow:0 0 0 1px rgba(255,190,85,.4),0 0 28px rgba(255,190,85,.35);transition:transform .15s,box-shadow .15s}
-.cta:hover{transform:translateY(-1px);box-shadow:0 0 0 1px rgba(255,190,85,.6),0 0 40px rgba(255,190,85,.55)}
-.cta.sm{padding:10px 18px;font-size:15px}
-.hero{padding:24px 0 20px;text-align:center}
-.mark{width:min(560px,90%);display:block;margin:0 auto -24px;mask-image:radial-gradient(ellipse 70% 60% at 50% 50%,#000 55%,transparent 100%);-webkit-mask-image:radial-gradient(ellipse 70% 60% at 50% 50%,#000 55%,transparent 100%)}
-.hero h1{font-size:clamp(30px,5.4vw,54px);line-height:1.08;margin:0 0 16px;letter-spacing:-.02em;font-weight:800}
-.hero h1 em{font-style:normal;color:var(--neon);text-shadow:0 0 18px rgba(255,190,85,.4)}
-.hero p{color:var(--muted);font-size:19px;max-width:640px;margin:0 auto 28px}
-.fine{color:var(--muted);font-size:14px;margin-top:14px}
-.badge{display:inline-block;font-family:"Russo One",Inter,sans-serif;font-size:13px;color:var(--neon);border:1px solid var(--neon-dim);border-radius:999px;padding:4px 12px;margin-bottom:18px}
-.bar{margin:44px auto 0;max-width:720px;background:#000;border:1px solid var(--line);border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:flex-end;font-size:14px}
-.bar .omac{font-family:"Russo One",Inter,sans-serif;color:#ff8a2a;font-weight:700;margin-right:auto}
-.agent{display:flex;align-items:center;gap:6px;color:#dbe5f5}
-.dot{width:11px;height:11px;border-radius:50%;display:inline-block}
-.g{background:var(--green);box-shadow:0 0 8px var(--green)}.y{background:var(--yellow);box-shadow:0 0 8px var(--yellow)}
-.r{background:var(--red);box-shadow:0 0 8px var(--red)}.k{background:var(--gray)}
-.pg{font-family:"Russo One",Inter,sans-serif;font-size:11px;color:var(--muted)}
-.phone{max-width:340px;margin:0 auto 12px;border-radius:28px;overflow:hidden;border:2px solid var(--line);box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 40px rgba(255,190,85,.15);background:#000}
-.phone video{width:100%;display:block;aspect-ratio:9/16}
-.skyhero{margin:4px auto 28px;border-radius:16px;overflow:hidden;border:1px solid var(--line);max-width:960px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
-.skyhero img{width:100%;display:block}
-.shot{margin:28px auto 0;border-radius:14px;overflow:hidden;border:1px solid var(--line);max-width:960px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
-.shot img{width:100%;display:block}
-h2.sec{font-family:"Russo One",Inter,sans-serif;color:var(--neon);text-align:center;font-size:clamp(20px,3vw,28px);margin:72px 0 8px}
-.sub{color:var(--muted);text-align:center;margin:0 auto 28px;max-width:600px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
-.card{background:linear-gradient(180deg,var(--card),var(--bg2));border:1px solid var(--line);border-radius:14px;padding:22px}
-.card h3{margin:0 0 8px;font-size:18px}.card p{margin:0;color:var(--muted);font-size:16px}
-.legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;max-width:860px;margin:0 auto}
-.legend div{display:flex;gap:10px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
-kbd{font-family:"Russo One",Inter,sans-serif;background:#000;border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:1px 7px;font-size:13px;color:var(--neon)}
-.price{text-align:center;padding:24px 0 72px}
-.pricebox{max-width:520px;margin:0 auto;background:var(--card);border:1px solid var(--neon-dim);border-radius:18px;padding:32px 22px;box-shadow:0 0 50px rgba(255,190,85,.12)}
-.amount{font-family:"Russo One",Inter,sans-serif;font-size:56px;color:var(--neon);line-height:1;text-shadow:0 0 20px rgba(255,190,85,.45)}
-.amount small{font-size:18px;color:var(--muted)}
-ul.perks{list-style:none;padding:0;margin:20px 0 24px;text-align:left}
-ul.perks li{padding:6px 0 6px 28px;position:relative;color:#dbe5f5}
-ul.perks li:before{content:"▪";position:absolute;left:6px;color:var(--neon)}
-.alt{display:inline-block;margin-top:14px;font-size:15px}
-footer{border-top:1px solid var(--line);padding:24px 0 40px;color:var(--muted);font-size:14px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
-@media (max-width:560px){.hero p{font-size:17px}.amount{font-size:44px}.bar{justify-content:center}.bar .omac{margin-right:0;width:100%;text-align:center}}
-</style>
-</head>
-<body>
-<div class="wrap">
-<header>
-  <a class="logo" href="#">OMAC</a>
-  <a class="cta sm" href="https://buy.stripe.com/00w3cv8Ef5cdgkgcUB6c000">Become a founder · $1</a>
-</header>
-
-<section class="hero">
-  <div class="skyhero"><img src="theme-sky.jpg" alt="OMAC"></div>
-  <div class="badge">FOUNDER ACCESS · FIRST 10,000</div>
-  <h1>Your Mac, keyboard-first.<br><em>Your agents, in view.</em></h1>
-  <p>OMAC tiles your terminals and apps into five pages, moves you around without the mouse, and puts a light in your menu bar for every AI agent — so you always know who needs you, and where.</p>
-  <a class="cta" href="https://buy.stripe.com/00w3cv8Ef5cdgkgcUB6c000">Try it for $1</a>
-  <div class="fine">$1/month, locked for life · Cancel anytime · The app keeps working if you do</div>
-
-  <div class="bar" aria-label="OMAC menu bar example">
-    <span class="omac">OMAC 1 2 3 4 5</span>
-    <span class="agent"><span class="dot g"></span>Claude <span class="pg">P1</span></span>
-    <span class="agent"><span class="dot y"></span>Codex <span class="pg">P2</span></span>
-    <span class="agent"><span class="dot r"></span>Hermes <span class="pg">P4</span></span>
-    <span class="agent"><span class="dot k"></span>Claude <span class="pg">P3</span></span>
-  </div>
-  
-</section>
-
-<h2 class="sec">Just say it</h2>
-<p class="sub">Meet Jev. Tell your Mac what to do: new terminal, open Chrome on page 3, switch to your other Mac. Real footage, real voice.</p>
-<div class="phone"><video src="jev-teaser.mp4" poster="jev-teaser-poster.jpg" controls playsinline preload="none"></video></div>
-
-<h2 class="sec">One light per agent</h2>
-<p class="sub">Claude Code, Codex, Hermes and your own agents report in. Each gets its own light with its app icon and page number. Pick a sound for each light, and repeat it every minute if you like, so you never miss the one that needs you.</p>
-<div class="legend">
-  <div><span class="dot g"></span><span><b>Green</b> — working</span></div>
-  <div><span class="dot y"></span><span><b>Yellow</b> — needs your approval or answer</span></div>
-  <div><span class="dot r"></span><span><b>Red</b> — blocked or failed</span></div>
-  <div><span class="dot k"></span><span><b>Gray</b> — idle or done</span></div>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Omac — Re-experience your Mac</title><meta name="description" content="Omac is a tiling window manager for Mac with its own terminal and a voice partner, Jev.">
+<link rel="icon" href="assets/omac-mark-light.svg"><link rel="stylesheet" href="assets/site.css"></head><body>
+<header class="top"><div class="wrap nav">
+<a class="brand" href="index.html"><img src="assets/omac-mark-light.svg" alt=""><span>Omac</span></a>
+<nav class="links"><a href="guide.html" >Guide</a><a href="plugins.html" >Plugins</a><a class="btn btn-dark" href="download.html">Download</a></nav>
+</div></header>
+<main>
+<div class="wrap hero">
+  <div class="eyebrow">A window manager for macOS</div>
+  <h1 style="margin-top:18px">Re-experience<br>your Mac.</h1>
+  <p class="lead">Omac tiles every window into place, gives you a fast terminal of its own, and a partner named Jev who moves things when you ask.</p>
+  <div class="actions"><a class="btn btn-dark" href="download.html">Download Omac</a><a class="btn btn-line" href="guide.html">See how it works</a></div>
+  <div class="note">Free to start. macOS 14 or later.</div>
 </div>
+<div class="wrap"><div class="showcase"><div class="term framed"><div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="title">Omac Terminal</span></div>
+<pre><span class="p">~ %</span> jev "move my Claude window next to me"
+<span class="j">Jev:</span> Bring Claude (page 3) next to this terminal? [y/n] y
+<span class="j">Jev:</span> Done. It is beside you.
 
-<h2 class="sec">Built for the keyboard</h2>
-<p class="sub">Every move is one shortcut away. Your hands never leave the keys.</p>
-<section class="grid">
-  <div class="card"><h3>Tile without thinking</h3><p><kbd>⌘</kbd> <kbd>Return</kbd> opens a terminal and it snaps into place. Five pages on <kbd>⌘1</kbd>–<kbd>⌘5</kbd>.</p></div>
-  <div class="card"><h3>Never touch the mouse</h3><p><kbd>⌘</kbd> arrows move focus, and a bright outline shows where you are.</p></div>
-  <div class="card"><h3>Speak an order</h3><p>Press <kbd>⌃⌥J</kbd> or turn on always-listening and say “Jev, open Chrome on page 3”. Audio stays on your Mac. Bring your own TypeSafe AI key, or skip Jev entirely.</p></div>
-  <div class="card"><h3>One Mac or two</h3><p>Setup asks once. With two Macs, a guided pairing lets <kbd>⌃⌥1</kbd> / <kbd>⌃⌥2</kbd>, or just “switch to Mac 2”, move you between them.</p></div>
-  <div class="card"><h3>It remembers</h3><p>Quit, update or restart OMAC. Your windows go back to their pages by themselves.</p></div>
-  <div class="card"><h3>Native and careful</h3><p>Swift and AppKit, notarized by Apple. Touches only the windows you choose, and undoes any move a window refuses.</p></div>
-</section>
+<span class="p">~ %</span> omac open chrome page 2
+<span class="d">Opening Chrome on page 2.</span>
 
-<h2 class="sec" id="price">Founders pay $1</h2>
-<section class="price">
-  <div class="pricebox">
-    <div class="amount">$1<small> / month</small></div>
-    <ul class="perks">
-      <li>OMAC for your Mac, notarized by Apple</li>
-      <li>Every update while you're a member</li>
-      <li>Your permanent founder number</li>
-      <li>The OMAC founders community on Skool</li>
-      <li>Cancel anytime. Your copy keeps working.</li>
-    </ul>
-    <a class="cta" href="https://buy.stripe.com/00w3cv8Ef5cdgkgcUB6c000">Get OMAC for $1</a><br>
-    <a class="alt" href="https://buy.stripe.com/8x228r3jV9stfgc7Ah6c001">or $12 a year</a>
-    <div class="fine">Price locked for life for the first 10,000 founders, then $5/month for new members.</div>
+<span class="p">~ %</span> omac theme pirate-waters
+<span class="d">Theme set.</span></pre></div></div></div>
+
+<section><div class="wrap">
+  <div class="head"><div class="eyebrow">What you get</div><h2 style="margin-top:14px">Everything in its place.</h2><p>No dragging, no hunting for windows. Omac keeps your pages tidy so you can stay on the work.</p></div>
+  <div class="grid">
+    <div class="card"><span class="k">⌘ 1–5</span><h3>Pages</h3><p>Five clean pages of tiled windows. Switch instantly; each page remembers its layout.</p></div>
+    <div class="card"><span class="k">⌘ ↩</span><h3>Omac Terminal</h3><p>A glass terminal built in. It opens tiled, takes your typing immediately, and keeps jobs running through a restart.</p></div>
+    <div class="card"><span class="k">jev "…"</span><h3>Jev</h3><p>Say it or type it. "Bring Chrome next to me." Jev asks once, then does it.</p></div>
+    <div class="card"><span class="k">⌘ W</span><h3>Smart closing</h3><p>Close a window and focus lands on the one beside it. Every time.</p></div>
+    <div class="card"><span class="k">⌃⌥ 1 / 2</span><h3>Two Macs</h3><p>Hop between two Macs from one keyboard, with the remote window tucked away.</p></div>
+    <div class="card"><span class="k">Themes</span><h3>Make it yours</h3><p>Oak, Pirate Waters, Pearl and more. Or have your own agent design a theme for you.</p></div>
   </div>
-</section>
+</div></section>
 
-<footer><span class="px">OMAC</span><span>macOS 14+ · Apple Silicon · Notarized by Apple</span></footer>
-</div>
-</body>
-</html>
+<section class="alt"><div class="wrap split">
+  <div><div class="eyebrow">Agents, at a glance</div><h2 style="margin-top:14px">Know what your agents are doing.</h2>
+  <p class="lead" style="margin-top:14px">Claude, Codex, Hermes and others report to the Omac bar. A glance tells you who is working, who is done, and who needs you.</p></div>
+  <ul class="list">
+    <li><b>Working</b><span>A steady light while an agent runs.</span></li>
+    <li><b>Needs you</b><span>A gentle sound and a highlight on the right page.</span></li>
+    <li><b>Done</b><span>One chime, then it stays out of your way.</span></li>
+  </ul>
+</div></section>
+
+<section><div class="wrap" style="text-align:center">
+  <h2>Start free. Keep it for a dollar.</h2>
+  <p class="lead" style="margin:16px auto 30px">Download Omac free from GitHub today. Supporter and Creator versions are coming soon.</p>
+  <a class="btn btn-tan" href="download.html">Choose your version</a>
+</div></section>
+</main>
+<footer><div class="wrap row"><a class="brand" href="index.html"><img src="assets/omac-mark-light.svg" alt=""><span>Omac</span></a><nav><a href="guide.html">Guide</a><a href="plugins.html">Plugins</a><a href="download.html">Download</a><a href="https://github.com/rickndanger-ctrl/omac">GitHub</a></nav><span>© 2026 Omac. Made for macOS.</span></div></footer><script src="assets/site.js"></script></body></html>
