@@ -2,7 +2,7 @@
   <img src="branding/omac-logo.svg" alt="Omac" width="320">
 </p>
 
-<p align="center"><b>Re-experience your Mac.</b><br>
+<p align="center"><b>Own your Mac.</b><br>
 A tiling window manager for macOS with its own terminal and a voice partner, Jev.</p>
 
 <p align="center">
