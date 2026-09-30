@@ -3,7 +3,7 @@
 </p>
 
 <p align="center"><b>Own your Mac.</b><br>
-A tiling window manager for macOS with its own terminal and a voice partner, Jev.</p>
+A tiling window manager built for AI agents, with its own terminal and a voice partner, Jev.</p>
 
 <p align="center">
   <a href="https://github.com/rickndanger-ctrl/omac/releases/latest"><b>Download for Apple Silicon</b></a> ·
