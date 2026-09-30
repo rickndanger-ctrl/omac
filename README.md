@@ -6,13 +6,15 @@
 A tiling window manager for macOS with its own terminal and a voice partner, Jev.</p>
 
 <p align="center">
-  <a href="https://github.com/rickndanger-ctrl/omac/releases/latest"><b>Download</b></a> ·
+  <a href="https://github.com/rickndanger-ctrl/omac/releases/latest"><b>Download for Apple Silicon</b></a> ·
   <a href="https://rickndanger-ctrl.github.io/omac/">Website</a> ·
   <a href="https://rickndanger-ctrl.github.io/omac/guide.html">Guide</a>
 </p>
 
-<!-- TEASER: replace with the 15-second teaser GIF once recorded -->
-<!-- <p align="center"><img src="branding/teaser.gif" alt="Omac in action" width="820"></p> -->
+<p align="center">
+  <a href="https://youtu.be/fCC9YHR6KLg"><img src="https://i.ytimg.com/vi/fCC9YHR6KLg/hqdefault.jpg" alt="Watch Own Your Mac. Meet Omac." width="480"></a><br>
+  <a href="https://youtu.be/fCC9YHR6KLg"><b>Watch the 33-second Omac demo</b></a>
+</p>
 
 ---
 
@@ -45,7 +47,7 @@ Or straight from a terminal:
 curl -sL $(curl -s https://api.github.com/repos/rickndanger-ctrl/omac/releases/latest | grep -o 'https://[^"]*\.dmg' | head -1) -o ~/Downloads/Omac.dmg && open ~/Downloads/Omac.dmg
 ```
 
-Requires macOS 14 or later.
+Requires an Apple Silicon Mac running macOS 14 or later.
 
 ## The keys worth knowing
 
