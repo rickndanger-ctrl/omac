@@ -33,7 +33,13 @@ A tiling window manager for macOS with its own terminal and a voice partner, Jev
 3. Follow Setup, and turn on **Accessibility** when macOS asks. That's how Omac moves windows.
 4. Press <kbd>⌘</kbd> <kbd>↩</kbd> for a terminal, and <kbd>⌘</kbd> <kbd>K</kbd> for every shortcut.
 
-Or from a terminal:
+With [Homebrew](https://brew.sh):
+
+```sh
+brew install --cask rickndanger-ctrl/omac/omac
+```
+
+Or straight from a terminal:
 
 ```sh
 curl -sL $(curl -s https://api.github.com/repos/rickndanger-ctrl/omac/releases/latest | grep -o 'https://[^"]*\.dmg' | head -1) -o ~/Downloads/Omac.dmg && open ~/Downloads/Omac.dmg
