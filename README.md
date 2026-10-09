@@ -25,7 +25,7 @@ A tiling window manager built for AI agents, with its own terminal and a voice p
 - **Jev, your partner.** Say it or type it: `jev "bring chrome next to me"`, `jev "open notes on page 2"`. Jev asks once, then does it.
 - **Your terminal is your assistant.** `omac open chrome page 2`, `omac text wife "on my way"`, `omac remind "call the plumber" tomorrow 9am`. It always confirms before sending anything.
 - **Know what your agents are doing.** Claude, Codex and Hermes report to the Omac bar: working, needs you, done.
-- **Two Macs, one keyboard.** Hop between Macs with <kbd>⌃</kbd> <kbd>⌥</kbd> <kbd>1</kbd> / <kbd>2</kbd>.
+- **Two-Mac switching — beta.** Switching between Macs with <kbd>⌃</kbd> <kbd>⌥</kbd> <kbd>1</kbd> / <kbd>2</kbd> remains experimental. Current reliability work prioritizes using OMAC on one Mac; see the latest release notes for known limits.
 - **Make it yours.** Themes like Oak and Pirate Waters, or have your own AI agent design one.
 
 ## Install
