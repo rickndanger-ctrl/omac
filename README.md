@@ -3,7 +3,7 @@
 </p>
 
 <p align="center"><b>Own your Mac.</b><br>
-A tiling window manager built for AI agents, with its own terminal and a voice partner, Jev.</p>
+A tiling window manager built for AI agents, with its own terminal and voice and typed commands that run on your Mac.</p>
 
 <p align="center">
   <a href="https://github.com/rickndanger-ctrl/omac/releases/latest"><b>Download for Apple Silicon</b></a> ·
@@ -22,7 +22,7 @@ A tiling window manager built for AI agents, with its own terminal and a voice p
 
 - **Every window in its place.** Apps and terminals tile themselves into clean layouts across five pages. <kbd>⌘</kbd> <kbd>1–5</kbd> switches instantly.
 - **Omac Terminal, built in.** A fast glass terminal that opens tiled, takes your typing immediately, and keeps jobs running through a restart. No extra terminal app needed.
-- **Jev, your partner.** Say it or type it: `jev "bring chrome next to me"`, `jev "open notes on page 2"`. Jev asks once, then does it.
+- **Just ask.** Say it or type it: press Control-Option-` and type `open Claude next to me`, or say "OMAC, take me to page four". Handled on your Mac; no key needed.
 - **Your terminal is your assistant.** `omac open chrome page 2`, `omac text wife "on my way"`, `omac remind "call the plumber" tomorrow 9am`. It always confirms before sending anything.
 - **Know what your agents are doing.** Claude, Codex and Hermes report to the Omac bar: working, needs you, done.
 - **Two-Mac switching — beta.** Switching between Macs with <kbd>⌃</kbd> <kbd>⌥</kbd> <kbd>1</kbd> / <kbd>2</kbd> remains experimental. Current reliability work prioritizes using OMAC on one Mac; see the latest release notes for known limits.
