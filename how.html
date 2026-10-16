@@ -1,0 +1,43 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>How it works — Omac</title><meta name="description" content="How Omac keeps windows where they belong: it owns its terminals, checks the screen instead of trusting apps, never leaves ghost windows, and is tested for hours before every release.">
+<link rel="icon" href="assets/omac-mark-light.svg"><link rel="stylesheet" href="assets/site.css"></head><body>
+<header class="top"><div class="wrap nav">
+<a class="brand" href="index.html"><img src="assets/omac-mark-light.svg" alt=""><span>Omac</span></a>
+<nav class="links"><a href="how.html" class="current">How it works</a><a href="guide.html" >Guide</a><a href="plugins.html" >Plugins</a><a class="btn btn-dark" href="download.html">Download</a></nav>
+</div></header>
+<main>
+<div class="wrap hero" style="padding-bottom:40px">
+  <div class="eyebrow">How it works</div>
+  <h1 style="margin-top:18px">Tiling that doesn't leave<br>ghost windows behind.</h1>
+  <p class="lead">Most tiling setups trust what each app says about its windows. Apps don't always tell the truth: a window that's gone still "exists," a window that moved still "sits" where it was, and processes pile up with nothing on screen. That's where ghost windows come from. Omac doesn't take an app's word for it. It checks.</p>
+</div>
+
+<div class="wrap" style="max-width:820px"><div class="steps">
+  <div class="step"><div><h3>It owns its own terminals</h3><p>Omac launches its terminals, keeps track of every process, and when the last window of a terminal it opened goes away, it closes that process itself. It doesn't rely on a setting that is supposed to do it, so empty terminals never pile up in your Dock.</p></div></div>
+  <div class="step"><div><h3>It checks the screen, not the app's word</h3><p>When a window says "I moved," Omac confirms it against what macOS is actually drawing. A tile can't quietly sit in the wrong place.</p></div></div>
+  <div class="step"><div><h3>A dead window can't come back as a ghost</h3><p>If a window an app reported has disappeared, Omac either finds that same live window again or treats it as closed. It never hands that window's place to some other window.</p></div></div>
+  <div class="step"><div><h3>It's tested for hours before every release</h3><p>An automated test opens, closes, moves and switches windows for an hour on one Mac and 45 minutes across two. A release only ships when the same build passes both with zero failures.</p></div></div>
+</div></div>
+
+<section><div class="wrap" style="max-width:820px">
+  <div class="head"><div class="eyebrow">Two Macs</div><h2 style="margin-top:14px">One keyboard, two Macs.</h2>
+  <p>Pair two Macs and press <kbd>⌃</kbd> <kbd>⌥</kbd> <kbd>2</kbd> to type on the other one, <kbd>⌃</kbd> <kbd>⌥</kbd> <kbd>1</kbd> to come back. The Screen Sharing window that carries your keyboard stays tucked into a corner, out of your tiles. Move the pointer across with Universal Control and the keyboard follows it: the Mac you left stands down by itself. When you come back, the window you were on is selected and highlighted again.</p></div>
+</div></section>
+
+<section class="alt"><div class="wrap split">
+  <div><div class="eyebrow">On your Mac</div><h2 style="margin-top:14px">Your commands stay on your Mac.</h2>
+  <p class="lead" style="margin-top:14px">Press <b>Control-Option-`</b> or click the small tab in the corner, and type what you want: "open Claude next to me," "take me to page four."</p></div>
+  <ul class="list">
+    <li><b>Handled locally</b><span>Typed and spoken commands are handled on your Mac. No key needed.</span></li>
+    <li><b>Nothing crosses over</b><span>With local voice on, no order, transcript or window name is sent to your other Mac. The link carries only the pointer hand-off.</span></li>
+    <li><b>Pause records stay home</b><span>If Omac ever pauses, it keeps a short note of what it was doing, on your Mac only.</span></li>
+  </ul>
+</div></section>
+
+<section><div class="wrap" style="text-align:center">
+  <h2>See it for yourself.</h2>
+  <p class="lead" style="margin:16px auto 30px">Free beta for Apple Silicon Macs, macOS 14 or later.</p>
+  <a class="btn btn-tan" href="download.html">Download Omac</a>
+</div></section>
+</main>
+<footer><div class="wrap row"><a class="brand" href="index.html"><img src="assets/omac-mark-light.svg" alt=""><span>Omac</span></a><nav><a href="how.html">How it works</a><a href="guide.html">Guide</a><a href="plugins.html">Plugins</a><a href="download.html">Download</a><a href="https://github.com/rickndanger-ctrl/omac">GitHub</a></nav><span>© 2026 Omac. Made for macOS.</span></div></footer><script src="assets/site.js"></script></body></html>
